@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.7 2004/01/17 20:50:47 whiles Exp whiles $
+ * $Id: pl_xcvr.c,v 1.8 2004/02/21 02:22:39 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -126,7 +126,7 @@ int xmit_init(struct xcvrio *arg)
     goto error;
   }
   setline(serial,CS8,B9600);	// specific to the device
-  while(!readchar(serial,&d,100));
+  while(!readchar(serial,&d,timeout));
   syslog(LOG_INFO,"Connecting to Powerlinc Serial Interface on %s\n",io->device);
   d = 0x02;
   res = write(serial,&d,1);
@@ -134,20 +134,20 @@ int xmit_init(struct xcvrio *arg)
     syslog(LOG_INFO,"Error write to %s (%s)\n",io->device,strerror(errno));
     goto error;
   }
-  if (readchar(serial,&d,1000)) {
+  if (readchar(serial,&d,timeout)) {
     syslog(LOG_INFO,"Timeout reading from %s\n",io->device);
     goto error;
   }
-  readchar(serial,&cr,1000);
+  readchar(serial,&cr,timeout);
   if (d != 0x06) {
     syslog(LOG_INFO,"PowerLinc serial module found, but not ready\n");
     goto error;
   }
   d = 'g';
   res = write(serial,&d,1);
-  readchar(serial,&buf[0],1000);
-  readchar(serial,&buf[1],1000);
-  readchar(serial,&buf[2],1000);
+  readchar(serial,&buf[0],timeout);
+  readchar(serial,&buf[1],timeout);
+  readchar(serial,&buf[2],timeout);
   buf[3] = '\0';
   syslog(LOG_INFO,"Powerinc version %s found\n",buf);
 
