@@ -4,19 +4,13 @@
 # $2 = kernel version number to build for
 # $3 = output RPM name
 
-if [ $# -ne 3 ]; then
-	echo "Syntax:  $0 wish_ver kernel_ver DEVFS|noDEVFS"
+if [ $# -ne 2 ]; then
+	echo "Syntax:  $0 wish_ver kernel_ver"
 	exit 1
 fi
 
 WISHVER="$1"
 KERNEL="$2"
-DEVFS="$3"
-
-if [ "$DEVFS" != "DEVFS" -a "$DEVFS" != "noDEVFS" ]; then
-	echo "must specify DEVFS or noDEVFS"
-	exit 1
-fi
 
 BUILDDIR="/tmp/$KERNEL-buildroot"
 rm -rf $BUILDDIR
@@ -27,7 +21,7 @@ echo "...creating spec file"
 
 cat << END_OF_SPEC > x10.spec
 Summary:  Linux X10 device drivers for PowerLinc USB, PowerLinc Serial, CM11A, and CM17A
-Name:  wish-linux-$KERNEL-$DEVFS
+Name:  wish-linux-$KERNEL
 Version: $WISHVER
 Release: 0
 Copyright:  GPL
@@ -55,6 +49,8 @@ cp example_scripts/x10.cm11a.sh \$RPM_BUILD_ROOT/usr/local/etc/x10_cm11a
 cp example_scripts/x10.cm17a.sh \$RPM_BUILD_ROOT/usr/local/etc/x10_cm17a
 cp example_scripts/x10.plusb.sh \$RPM_BUILD_ROOT/usr/local/etc/x10_plusb
 cp example_scripts/x10.pl.sh \$RPM_BUILD_ROOT/usr/local/etc/x10_pl
+mkdir -p \$RPM_BUILD_ROOT/tmp
+cp scripts/makedev.sh \$RPM_BUILD_ROOT/tmp
 mkdir -p \$RPM_BUILD_ROOT/usr/sbin
 mkdir -p \$RPM_BUILD_ROOT/usr/bin
 install -o root utils/x10attach \$RPM_BUILD_ROOT/usr/sbin/x10attach
@@ -62,7 +58,10 @@ install -o root utils/x10logd \$RPM_BUILD_ROOT/usr/sbin/x10logd
 install -o root utils/nbread \$RPM_BUILD_ROOT/usr/bin/nbread
 install -o root utils/x10watch \$RPM_BUILD_ROOT/usr/bin/x10watch
 mkdir -p \$RPM_BUILD_ROOT/dev/x10
-./makedev.sh 120 121 \$RPM_BUILD_ROOT/dev/x10
+./scripts/makedev.sh 120 121 \$RPM_BUILD_ROOT/dev/x10
+
+%post
+/tmp/makedev.sh
 
 %clean
 cd \$RPM_BUILD_ROOT
@@ -82,11 +81,9 @@ make clean
 /usr/local/etc/x10_cm17a
 /usr/local/etc/x10_plusb
 /usr/local/etc/x10_pl
+/usr/share/doc/wish-$WISHVER/*
+/tmp/makedev.sh
 END_OF_SPEC
-
-if [ "$DEVFS" != "DEVFS" ]; then
-	echo "/dev/x10" >> x10.spec
-fi
 
 echo "... building RPM package"
 rpm -bb x10.spec
