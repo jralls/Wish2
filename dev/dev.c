@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.17 2004/06/27 18:21:05 whiles Exp whiles $
+ * $Id: dev.c,v 1.18 2004/06/27 18:50:24 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.17 2004/06/27 18:21:05 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.18 2004/06/27 18:50:24 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 static int delay=1;
 
@@ -233,6 +233,10 @@ static void updatestatus(int hc, int uc, int newvalue, int markchanged)
     state.hc_statuschanged |= 1<<hc;
     state.all_statuschanged = 1;
   }
+    if (waitqueue_active(&x10api.mqueue->wq)){
+      dbg("Waking up data mqueue waits");
+      wake_up_interruptible(&x10api.mqueue->wq);
+    }
   spin_unlock(&state.spinlock_status);
 }
 static unsigned int getstatus(int hc, int uc,int reset)
