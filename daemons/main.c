@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.7 2004/01/14 03:16:21 whiles Exp whiles $
+ * $Id: main.c,v 1.8 2004/01/16 16:27:55 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -65,9 +65,10 @@ static char *progname;				// name used to start program
 static char *logtag;				// tag to add to log lines
 static int syslog_facility=LOG_LOCAL5;
 static int api;					// file handle for the API interface
-int timeout=10;				// timeout for waiting for response from API
-int retries=5;				// retries for failures
-int delay=0;				// delay before retrying
+int timeout=1000;				// timeout for waiting for response from API
+int retries=5;					// retries for failures
+int delay=0;					// delay before retrying
+int fakereceive=0;				// fake receive what is sent
 static int xmitpid=0;				// pid for transmitter thread
 static char *serial=NULL;			// serial device
 static void **xmitstack;			// stack space for transmit thread
@@ -112,6 +113,8 @@ int main(int argc,char *argv[])
     } else if (!strcasecmp(&arg[1],"api")) {
       TESTNEXTARG;
       device = argv[++i];
+    } else if (!strcasecmp(&arg[1],"fakereceive")) {
+      fakereceive = 1;
     } else if (!strcasecmp(&arg[1],"debug")) {
       debug = 1;
     } else if (!strcasecmp(&arg[1],"pid")) {
@@ -238,13 +241,14 @@ void syntax(int argc, char *argv[], int i)
   else
     fprintf(stderr,"Unknown argument:  %s\n",argv[i]);
 
-  fprintf(stderr,"Syntax:  %s [-api device] [-pid pidfile] [-tag logtag] [-debug] -device device\n",progname);
+  fprintf(stderr,"Syntax:  %s [-api device] [-pid pidfile] [-tag logtag] [-debug] [-timeout #] [-retries #] [-fakereceive] -device device\n",progname);
   fprintf(stderr,"         -api device  - X10 device driver api file (default: %s)\n",defdevice);
   fprintf(stderr,"         -pid pidfile - File to write driver PID to (default: %s)\n",defpidfile);
   fprintf(stderr,"         -tag logtag  - Tag to be written to syslog (default: %s)\n",progname);
   fprintf(stderr,"         -timeout #   - Timeout while waiting for response from api (default: 10)\n");
-  fprintf(stderr,"         -retries #   - Number of times to retry on failure (default: 1)\n");
-  fprintf(stderr,"         -delay #     - Number of seconds to delay after failure (default: 0)\n");
+  fprintf(stderr,"         -retries #   - Number of times to retry on failure (default: %d)\n",retries);
+  fprintf(stderr,"         -delay #     - Number of seconds to delay after failure (default: %d)\n",delay);
+  fprintf(stderr,"         -fakereceive - Loop transmitted information back to receiver\n");
   fprintf(stderr,"         -debug       - Turn on debug mode\n");
   fprintf(stderr,"         -device	- transceiver device file\n");
 }
@@ -347,8 +351,9 @@ static void listen()
         break;
       case X10_DATA:
       case X10_CONTROL:
-        xcvrio.send(m.housecode,m.unitcode,m.command);
-        update_state(1,m.housecode,m.unitcode,m.command,NULL,0);
+        xcvrio.send(m.housecode,m.unitcode==0xff?-1:m.unitcode,m.command==0xff?-1:m.command);
+	if (fakereceive == 1)
+          update_state(1,m.housecode,m.unitcode==0xff?-1:m.unitcode,m.command==0xff?-1:m.command,NULL,0);
         break;
       default:
         dsyslog(LOG_INFO,"Error - invalid API source %d\n",m.source);
@@ -408,13 +413,11 @@ static int update_state(int dir, int hc, int uc, int fc,unsigned char *buf, int 
 {
   int i,ret=0;
 
-  dsyslog(LOG_INFO,"dir=%d, hc=0x%x, uc=0x%x, fc=0x%x\n",dir,hc,uc,fc);
+  dsyslog(LOG_INFO,"update_state:  dir=%d, hc=0x%x, uc=0x%x, fc=0x%x\n",dir,hc,uc,fc);
   hc &= 0x0f;
-  uc &= 0x0f;
 
   sem_wait(&state.lock);
 
-  updatelog(dir,hc,uc,fc);
   // if we get a preset dim high/low, we can store the level only if:
   //   the previous housecode was stored
   //   the previous message received was not a function (had to be unit)
@@ -437,6 +440,8 @@ static int update_state(int dir, int hc, int uc, int fc,unsigned char *buf, int 
     state.uc[state.hc][uc] = 1;
     state.lastuc = uc;
   }
+  if (fakereceive == 1 || dir == 0)
+    updatelog(dir,hc,uc,fc);
   // something just changed so now update the queue head to wake everyone up
 
   if (fc >= 0) {
