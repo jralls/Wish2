@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.13 2004/06/21 03:48:44 whiles Exp whiles $
+ * $Id: main.c,v 1.14 2004/06/27 18:17:32 whiles Exp $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -72,6 +72,7 @@ int fakereceive=0;				// fake receive what is sent
 static int xmitpid=0;				// pid for transmitter thread
 static char *serial=NULL;			// serial device
 static void **xmitstack;			// stack space for transmit thread
+pthread_t tid;
 
 char localhostname[MAXHOSTNAMELEN+1];
 char *localdomain;
@@ -328,9 +329,9 @@ static void listen()
 
   xcvrio.device = serial;
   xcvrio.logtag = logtag;
-  xmitstack = malloc(CHILDSTACKSIZE);
-  dsyslog(LOG_INFO,"starting transceiver\n");
-  xmitpid = clone((int (*)(void *))xmit_init,xmitstack,CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_PTRACE | CLONE_VM,(void *)&xcvrio);
+  dsyslog(LOG_INFO,"starting transceiver (pthread_create)\n");
+  xmitpid = pthread_create(&tid,NULL,(void *)xmit_init,(void *)&xcvrio);
+  dsyslog(LOG_INFO,"pthread_crate completed...transceiver started\n");
   if (xmitpid < 0) {
     syslog(LOG_INFO, "unable to clone, exiting - %s\n",strerror(errno));
     unlink(pidfile);
