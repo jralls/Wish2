@@ -1,6 +1,6 @@
 /*
  *
- * $Id: x10d.c,v 1.1 2004/01/01 21:35:05 whiles Exp whiles $
+ * $Id: x10d.c,v 1.2 2004/01/03 20:44:23 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -45,7 +45,8 @@ int main(int argc, char *argv[])
 		printf("Syntax:  x10d <devicename>\n");
 		return 1;
 	}
-	inf = open(argv[1],O_RDWR | O_NONBLOCK);
+//	inf = open(argv[1],O_RDWR | O_NONBLOCK);
+	inf = open(argv[1],O_RDWR);
 	if (inf < 0) {
 		printf("Error:  Unable to open %s for reading\n",argv[1]);
 		return 1;
@@ -54,19 +55,29 @@ int main(int argc, char *argv[])
 	m.housecode = m.unitcode = 0;
 	m.command = X10_CMD_STATUS;
 	m.flag = 0;
+	fprintf(stderr, "Writing...\n");
 	write(inf,&m,sizeof(m));
-	return 0;
+	fprintf(stderr, "Writing completed...\n");
+	sleep(1);
 	while (1) {
+		fprintf(stderr, "Reading...\n");
+		memset(&m,0,sizeof(m));
 		n = read(inf,&m,sizeof(m));
 		if (n < sizeof(m)) {
-			printf("Error:  Unable to read %s\n",argv[1]);
+			fprintf(stderr, "Error:  Unable to read %s\n",argv[1]);
 			return 1;
 		}
 		if (n == 0)   // end of file
 			return 0;
+//		if (n > 0) {
+			fprintf(stderr, "source:\t0x%x\n",m.source);
+			fprintf(stderr, "housecode:\t0x%x\n",m.housecode);
+			fprintf(stderr, "unitcode:\t0x%x\n",m.unitcode);
+			fprintf(stderr, "command:\t0x%x\n",m.command);
+			sleep(1);
+//		}
 		if (m.source == X10_API && m.command == X10_CMD_ON){
-			printf("Successfully opened X10 API");
-			return 0;
+			fprintf(stderr, "Successfully opened X10 API\n");
 		}
 	}
 	return 1;
