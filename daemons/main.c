@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.16 2004/10/21 01:30:20 whiles Exp root $
+ * $Id: main.c,v 1.17 2005/03/27 04:37:47 root Exp root $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -66,7 +66,6 @@ static char *logtag;				// tag to add to log lines
 static int syslog_facility=LOG_LOCAL5;
 static int api;					// file handle for the API interface
 int timeout=1000;				// timeout for waiting for response from API
-int hold=0;					// 1/4 microseconds to wait between commands
 int retries=5;					// retries for failures
 int delay=0;					// delay before retrying
 int fakereceive=0;				// fake receive what is sent
@@ -147,10 +146,6 @@ int main(int argc,char *argv[])
       TESTNEXTARG;
       timeout = atoi(argv[++i]);
       dprintf("%s, timeout set to %s\n",progname,timeout);
-    } else if (!strcasecmp(&arg[1],"hold")) {
-      TESTNEXTARG;
-      hold = atoi(argv[++i]);
-      dprintf("%s, sleep set to %s\n",progname,hold);
     } else {
       syntax(argc,argv,i);
       exit (-1);
@@ -264,7 +259,6 @@ void syntax(int argc, char *argv[], int i)
   fprintf(stderr,"         -pid pidfile - File to write driver PID to (default: %s)\n",defpidfile);
   fprintf(stderr,"         -tag logtag  - Tag to be written to syslog (default: %s)\n",progname);
   fprintf(stderr,"         -timeout #   - Timeout while waiting for response from api (default: %d)\n",timeout);
-  fprintf(stderr,"         -hold #      - Number of 1/4 microseconds to wait between writes (default: %d)\n",hold);
   fprintf(stderr,"         -retries #   - Number of times to retry on failure (default: %d)\n",retries);
   fprintf(stderr,"         -delay #     - Number of seconds to delay after failure (default: %d)\n",delay);
   fprintf(stderr,"         -fakereceive - Loop transmitted information back to receiver\n");
