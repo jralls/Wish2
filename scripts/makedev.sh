@@ -1,9 +1,22 @@
 #!/bin/sh
 #
-# $Id: makedev.sh,v 1.2 2002/11/29 01:32:59 root Exp whiles $
+# $Id: makedev.sh,v 1.3 2003/01/06 15:53:36 whiles Exp root $
 #
 MAJOR_DATA=120
 MAJOR_CONTROL=121
+if [ $# -eq 2 ]
+then
+	MAJOR_DATA=$1
+	MAJOR_CONTROL=$2
+elif [ $# -ne 0 ]
+then
+	echo "Syntax $0 [data_major control_major]"
+	exit 1
+fi
+
+echo "MAJOR_DATA=$MAJOR_DATA"
+echo "MAJOR_CONTROL=$MAJOR_CONTROL"
+exit 1
 
 if [ ! -d /dev/x10 ]; then mkdir /dev/x10; fi
 
