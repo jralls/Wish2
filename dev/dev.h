@@ -3,7 +3,7 @@
 
 /*
  *
- * $Id: dev.h,v 1.5 2004/01/03 20:39:59 whiles Exp whiles $
+ * $Id: dev.h,v 1.6 2004/01/04 19:36:45 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -75,9 +75,6 @@
 #define MODULE_LICENSE(a) static char __module_license=(a);
 #endif
 
-#define MAX_HOUSECODES 16
-#define MAX_UNITS 16
-
 #define X10_CONTROL_WITHOUTHDRS         0x0
 #define X10_CONTROL_WITHHDRS            0x1
 #define X10_CONTROL_READCHANGED         0x2
@@ -107,6 +104,7 @@ typedef struct x10mqueue {
   atomic_t	tail;
   spinlock_t    spinlock;
   wait_queue_head_t wq;
+  wait_queue_head_t apiq;
   x10_message_t	queue[MESSAGE_QUEUE_SIZE];
 } x10mqueue_t;
 
