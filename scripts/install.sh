@@ -20,6 +20,8 @@ fi
 
 echo "cp -f x10attach /usr/sbin/"
 cp -f x10attach /usr/sbin/
+echo "cp -f nbread /usr/sbin/"
+cp -f nbread /usr/sbin/
 echo "cp -f *.o $moduledir"
 cp -f *.o $moduledir
 echo "depmod -a $ver"
