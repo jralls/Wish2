@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.7 2004/01/17 20:50:47 whiles Exp whiles $
+ * $Id: plusb_xcvr.c,v 1.1 2004/01/18 18:20:30 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -55,14 +55,18 @@
 
 #include <asm/types.h>
 
+#include <linux/usbdevice_fs.h>
 #include <linux/hiddev.h>
 
 #include "../include/x10.h"
 #include "x10d.h"
 #include "plusb_xcvr.h"
 
+#define USB_ENDPOINT_IN		0x80
+#define USB_ENDPOINT_OUT	0x00
+
 int transmit(int hc, int uc, int cmd);
-static void start();
+static void startup();
 int serial=0;
 
 struct xcvrio *io = NULL;
@@ -70,20 +74,29 @@ sem_t sem_ack;
 int ack;
 sem_t cts;
 
-int readpacket(int fd,char *c,int timeout)
+int hidwrite(int fd,unsigned char *c,int length)
 {
-  struct timeval tv;
-  fd_set set;
-  int ret;
+  struct usbdevfs_bulktransfer data;
+  int ret,sent = 0;
+  
+  data.ep &= ~USB_ENDPOINT_IN;
+  data.len = length;
+  data.timeout = 0;
+  data.data = c;
+  ret = ioctl(fd,USBDEVFS_BULK,&data);
+  return ret;
+}
 
-  tv.tv_sec = 0;
-  tv.tv_usec = timeout*1000;
-  FD_ZERO(&set);
-  FD_SET(fd,&set);
-  ret = select(fd+1,&set,NULL,NULL,&tv);
-  if (ret != 0)
-    return ret;
-  ret = read(fd,c,8);
+int hidread(int fd,unsigned char *c, int length, int timeout)
+{
+  struct usbdevfs_bulktransfer data;
+  int ret,sent = 0;
+  
+  data.ep |= USB_ENDPOINT_IN;
+  data.len = length;
+  data.timeout = timeout;
+  data.data = c;
+  ret = ioctl(fd,USBDEVFS_BULK,&data);
   return ret;
 }
 
@@ -95,7 +108,8 @@ int xmit_init(struct xcvrio *arg)
 {
   ssize_t ret;
   struct hiddev_devinfo usbinfo;
-  __u8 start[8];
+  struct pl_cmd data;
+  unsigned char start[8];
 
   syslog(LOG_INFO,"Transmit thread starting\n");
   sem_init(&sem_ack,0,0);
@@ -104,21 +118,28 @@ int xmit_init(struct xcvrio *arg)
   io->send = transmit;
   // Now, connect up and set the status to 0 if successful.  Finally, post to the semaphore to let
   // the parent know that all is well...then just wait for input from the device...
-  serial = open(io->device,O_RDWR | O_NONBLOCK);
+  serial = open(io->device,O_RDWR | O_NOCTTY);
   if (serial < 0) {
     syslog(LOG_INFO,"Error opening %s (%s)\n",io->device,strerror(errno));
     goto error;
   }
   dsyslog(LOG_INFO,"Connecting to USB Powerlinc Interface on %s\n",io->device);
-  ioctl(serial,HIDIOCGDEVINFO,&usbinfo);
-  dsyslog(LOG_INFO,"%s: Vendor 0x04hx, Product 0x%04hx version 0x%04hx\n",io->device,usbinfo.vendor,usbinfo.product,usbinfo.version);
+//  ioctl(serial,HIDIOCGDEVINFO,&usbinfo);
+//  ret = read(serial,(void *)&descriptor,sizeof(descriptor));
+  dsyslog(LOG_INFO,"%s: Vendor 0x%04hx, Product 0x%04hx version 0x%04hx\n",io->device,usbinfo.vendor,usbinfo.product,usbinfo.version);
   dsyslog(LOG_INFO,"%s: %i application%s on bus %d, devnum %d, ifnum %d\n",io->device,usbinfo.num_applications,(usbinfo.num_applications==1?"":"s"),usbinfo.busnum,usbinfo.devnum,usbinfo.ifnum);
-  syslog(LOG_INFO,"USB Powerinc version 0x%04hx found\n",usbinfo.version);
+  if (usbinfo.vendor == 0x10bf) {
+    syslog(LOG_INFO,"USB Powerinc version 0x%04hx found\n",usbinfo.version);
+  }
+  else {
+    syslog(LOG_INFO,"%s is not a USB PowerLinc\n",io->device);
+    goto error;
+  }
   memset(start,0,sizeof(start));
   start[0] = X10_PLUSB_XMITCTRL;
   start[1] = X10_PLUSB_TCTRLQUALITY;
   start[2] = 0x1e;                        // detect threshold
-  ret = write(serial,start,8);
+  ret = hidwrite(serial,start,sizeof(start));
   if (ret < 0) {
     syslog(LOG_INFO,"USB Powerlinc initialization failed on setup1 (%s)\n",strerror(errno));
     goto error;
@@ -128,7 +149,7 @@ int xmit_init(struct xcvrio *arg)
            | X10_PLUSB_TCTRLRSTRPT        // turn off reporting mode
            | X10_PLUSB_TCTRLWAIT;         // transmit after quiet period
   start[2] = 0;
-  ret = write(serial,start,8);
+  ret = hidwrite(serial,start,sizeof(start));
   if (ret < 0) {
     syslog(LOG_INFO,"USB Powerlinc initialization failed on setup2 (%s)\n",strerror(errno));
     goto error;
@@ -136,12 +157,12 @@ int xmit_init(struct xcvrio *arg)
   usleep(delay*1000);
   start[0] = X10_PLUSB_XMITCTRL;
   start[1] = X10_PLUSB_TCTRLSTATUS;       // request status response
-  ret = write(serial,start,8);
+  ret = hidwrite(serial,start,sizeof(start));
   if (ret < 0) {
     syslog(LOG_INFO,"USB Powerlinc initialization failed on status request (%s)\n",strerror(errno));
     goto error;
   }
-  ret = readpacket(serial,start,timeout);
+  ret = hidread(serial,start,sizeof(start),timeout);
   if (ret < 0) {
     syslog(LOG_INFO,"USB Powerlinc initialization failed to return status (%s)\n",strerror(errno));
     goto error;
@@ -155,7 +176,7 @@ done:
   if (delay < 1000)
     delay = 1000;
   sem_init(&cts,0,1);
-//  start();
+  startup();
   return 0;
 error:
   io->status = errno;
@@ -291,7 +312,7 @@ int transmit(int hc, int uc, int cmd)
   if (uc >= 0){            // negative value for u causes us to skip u
     data.d.byte[i] = unitcode[uc] | 0x40;
     dsyslog(LOG_INFO,"sending %s", dumphex(scratch,(void *) &data, sizeof(data)));
-    ret = write(serial, &data, sizeof(data));
+    ret = hidwrite(serial, (unsigned char *)&data, sizeof(data));
     if (!waitforack(timeout)){
       syslog(LOG_INFO,"timeoutwaiting for ACK from USB PowerLinc\n");
       ret = -1;
@@ -302,7 +323,7 @@ int transmit(int hc, int uc, int cmd)
   if (cmd >= 0){          // negative value for cmd causes us to skip cmd
     data.d.byte[i] = functioncode[cmd] | 0x60;
     dsyslog(LOG_INFO,"sending %s", dumphex(scratch,(void *) &data, sizeof(data)));
-    ret = write(serial, &data, sizeof(data));
+    ret = hidwrite(serial, (unsigned char *)&data, sizeof(data));
     if (!waitforack(timeout)){
       syslog(LOG_INFO,"timeoutwaiting for ACK from USB PowerLinc\n");
       ret = -1;
@@ -355,21 +376,20 @@ static void decode(unsigned char *buf, int count)
   }
 }
 
-static void start()
+static void startup()
 {
-  int n;
-  int index=0,flags;
-  unsigned char buf[48],c[9];
+  int flags;
+  unsigned char c[8];
 
 // set the device into blocking mode now
 //  fcntl....
-  flags = fcntl(serial,F_GETFL);
-  flags &= ~O_NONBLOCK;
-  fcntl(serial,F_SETFL,flags);
+//  flags = fcntl(serial,F_GETFL);
+//  flags &= ~O_NONBLOCK;
+//  fcntl(serial,F_SETFL,flags);
   while (1) {
-    flags = read(serial,&c,8);
+    flags = hidread(serial,c,sizeof(c),timeout);
     if (flags > 0){
-      decode(c,8);
+      decode(c,sizeof(c));
     }
     else if (flags < 0){
       syslog(LOG_INFO,"ERROR:  read error (%s)\n",strerror(errno));
