@@ -26,12 +26,12 @@ all:
 clean:
 	(cd daemons; make clean)
 	(cd utils; make clean)
-	(cd dev; build.sh clean)
+	(cd dev; make clean)
 
 install:
 	sh ./scripts/install.sh $(KERNELDIR)
 ifneq (/dev/x10,$(wildcard /dev/x10))
 	sh ./scripts/makedev.sh
 endif
-	(cd dev; build.sh install)
+	(cd dev; make install)
 
