@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.3 2004/01/14 03:16:41 whiles Exp whiles $
+ * $Id: pl_xcvr.c,v 1.4 2004/01/16 16:27:27 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -102,6 +102,7 @@ void setline(int fd, int flags, int speed)
 struct xcvrio *io = NULL;
 sem_t sem_ack;
 int ack;
+sem_t cts;
 
 // xmit_init is the only function that is required.  It must set the xcvrio.send function
 // to a non-null value immediately
@@ -155,6 +156,9 @@ int xmit_init(struct xcvrio *arg)
 done:
   io->status = 0;
   sem_post(&io->connected);
+  if (delay < 1000)
+    delay = 1000;
+  sem_init(&cts,0,1);
   start();
   return 0;
 error:
@@ -226,7 +230,7 @@ static int waitforack(int timeout)
       dsyslog(LOG_INFO,"received ACK/NAK\n");
       return ack;
     }
-    usleep(1);
+    usleep(1000);
   }
   return 0;
 }
@@ -253,6 +257,20 @@ static int clearack()
   ack = 0;
 }
 
+static int sem_wait_timeout(sem_t *sem,int timeout)
+{
+  int i;
+
+  dsyslog(LOG_INFO,"sem_wait_timeout: timeout %d\n",timeout);
+  for (i = 0; i < timeout; i++) {
+    if (sem_trywait(sem) != 0) 
+      return 0;
+    usleep(1000);
+  }
+  dsyslog(LOG_INFO,"timeout waiting for transmitter\n",timeout);
+  return 1;
+}
+
 int startup()
 {
   unsigned char c;
@@ -261,7 +279,6 @@ int startup()
   dsyslog(LOG_INFO,"startup...\n");
   c = X10_PL_START;
   for (i = 0; i < retries; i++) {
-    clearack();
     dsyslog(LOG_INFO,"sending 0x%x\n",X10_PL_START);
     ret = write(serial,&c,1);
     ack = waitforack(timeout);
@@ -283,10 +300,10 @@ int transmit(int hc, int uc, int cmd)
   unsigned char data[5];
   char scratch[40];
 
+  dsyslog(LOG_INFO,"transmit:  hc=0x%x, uc=0x%x, fc=0x%x\n",hc,uc,cmd);
   if (cmd >= X10_CMD_END)
     return 1;
   hc &= 0x0f;
-  uc &= 0x0f;
   memset(data,0,sizeof(data));
   i = 0;
   data[i++] = X10_PL_SENDCMD;
@@ -296,19 +313,21 @@ int transmit(int hc, int uc, int cmd)
   if (cmd >= 0)
     data[i++] = functioncode[cmd] | 0x40;
   data[4] = X10_PL_REPEATONCE;
+  if (sem_wait_timeout(&cts,timeout)) {
+    syslog(LOG_INFO,"Timeout while waiting for transmitter\n");
+    syslog(LOG_INFO,"If this persists, restart daemon\n");
+    return -1;
+  }
   if (startup()) {
     syslog(LOG_INFO,"unable to communicate with PowerLinc Transceiver\n");
-    goto error;
+    return -1;
   }
   dsyslog(LOG_INFO,"sending %s\n",dumphex(scratch,(void *)data,sizeof(data)));
   ret = write(serial,data,sizeof(data));
-  if (!waitforack(timeout)){
-    dsyslog(LOG_INFO,"timeout waiting for ACK\n");
-    goto error;
-  }
+  dsyslog(LOG_INFO,"sleeping for %d microseconds\n",delay);
+  usleep(delay*1000);
+  sem_post(&cts);			// enable transmitter
   return ret;
-error:
-  return -1;
 }
 
 static void decode(unsigned char *buf, int count)
