@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: makedev.sh,v 1.4 2003/01/17 02:37:20 root Exp root $
+# $Id: makedev.sh,v 1.5 2003/01/17 03:00:15 root Exp whiles $
 #
 MAJOR_DATA=120
 MAJOR_CONTROL=121
@@ -14,6 +14,18 @@ elif [ $# -ne 0 ]
 then
 	echo "Syntax $0 [data_major control_major basedir]"
 	exit 1
+fi
+
+if [ -e /dev/.devfsd -a -x /sbin/devfsd ]
+then
+	echo "DEVFS currently running.  No need to create /dev devices"
+	exit 0
+fi	
+
+if [ -d /dev/x10 ]
+then
+	echo "/dev/x10 already exists, not remaking devices"
+	exit 0
 fi
 
 echo "Creating X10 devices in $DIR with data_major=$MAJOR_DATA and control_major=$MAJOR_CONTROL"
