@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: x10_dev.c,v 1.5 2004/01/01 21:33:33 whiles Exp whiles $
+ * $Id: dev.c,v 1.7 2004/01/04 19:36:31 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: x10_dev.c,v 1.5 2004/01/01 21:33:33 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.7 2004/01/04 19:36:31 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
@@ -573,8 +573,10 @@ static int x10_open (struct inode *inode, struct file *file)
     init_waitqueue_head(&x10api.mqueue->wq);
   }
   else if (major == x10api.control_major) {
-    if (x10api.us_connected != 1)
+    if (x10api.us_connected != 1){
+      dbg("%s","/dev device opened without userspace connection");
       return -EFAULT;
+    }
     x10controlio_t *ctrl = (x10controlio_t *)kmalloc(sizeof(x10controlio_t),GFP_KERNEL);
     file->private_data = (void *)ctrl;
     memset(ctrl,0,sizeof(x10controlio_t));
@@ -590,8 +592,10 @@ static int x10_open (struct inode *inode, struct file *file)
     }
   }
   else if (major == x10api.data_major){
-    if (x10api.us_connected != 1)
+    if (x10api.us_connected != 1){
+      dbg("%s","/dev device opened without userspace connection");
       return -EFAULT;
+    }
     x10dataio_t *data = (x10dataio_t *)kmalloc(sizeof(x10dataio_t),GFP_KERNEL);
     file->private_data = (void *)data;
     atomic_set(&data->changed,1);
@@ -681,12 +685,15 @@ static ssize_t x10_read (struct file *file, char *ubuffer, size_t length, loff_t
   int hc = HOUSECODE (minor);
 //  int uc = UNITCODE (minor);
 
-  ANNOUNCE;
-  dbg ("major=%d, minor=%d", major, minor);
-  if (major == x10api.control_major)
-    dbg ("(CTRL) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
-  else
-    dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
+  if (!(major == x10api.control_major && hc == X10_CONTROL_API)){
+    // don't add the debug information if the reads come from the API interface
+    ANNOUNCE;
+    dbg ("major=%d, minor=%d", major, minor);
+    if (major == x10api.control_major)
+      dbg ("(CTRL) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
+    else
+      dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
+  }
 
   if (major == x10api.control_major && hc == X10_CONTROL_API){
     x10_message_t m;
