@@ -1,6 +1,6 @@
 /*
  *
- * $Id: cm11a_xcvr.c,v 1.4 2004/06/27 18:17:07 whiles Exp whiles $
+ * $Id: cm11a_xcvr.c,v 1.5 2004/10/21 01:29:46 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -274,7 +274,7 @@ static unsigned char functioncode[] = {
   0x0d, 0x0e, 0x0f, 0x09
 };
 
-static int decode_housecode(char hc)
+static int decode_housecode(unsigned char hc)
 {
   int i;
 
