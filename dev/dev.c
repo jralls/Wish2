@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.15 2004/02/21 02:23:48 whiles Exp whiles $
+ * $Id: dev.c,v 1.16 2004/06/21 03:47:30 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.15 2004/02/21 02:23:48 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.16 2004/06/21 03:47:30 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
@@ -163,17 +163,24 @@ dumphex (void *data, int len)
 void usleep(int usec)
 {
   int cs;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+  // kernel 2.6.0 is better at multithreads so we have the ability to 
+  // to use usleep to sleep for shorter intervals.  For 2.4.X, usleep 
+  // will hang the kernel for the sleep period.
   if (usec < 600)
     udelay(usec);
   else if (usec*HZ < 2<<19)
     for (;usec>0;usec-=500) 
       udelay((usec>500)?500:usec);
   else {
+#endif
     cs = current->state;
     current->state=TASK_INTERRUPTIBLE;
     schedule_timeout((long)((usec*HZ)>>19));
     current->state = cs;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
   }
+#endif
 }
 
 // ************************************************************************
@@ -793,8 +800,10 @@ static int x10mqueue_add(x10mqueue_t *q,int source,int hc, int uc, int cmd, __u3
     ret = 0;
   }
   dbg("source=%x, hc=%x, uc=%x, cmd=%x, f=%x, pos=%d",source,hc,uc,cmd,f,tail);
-  if (waitqueue_active(&x10api.mqueue->apiq))
+  if (waitqueue_active(&x10api.mqueue->apiq)){
+    dbg("Waking up mqueue waits");
     wake_up_interruptible(&x10api.mqueue->apiq);
+  }
   spin_unlock(&q->spinlock);
   return ret;
 }
@@ -989,9 +998,14 @@ static ssize_t data_write(struct file *file,const char *ubuffer,size_t length, l
   else 
     ret = x10mqueue_add(x10api.mqueue,X10_DATA,hc,uc,cmd,0);
   if (!(file->f_flags & O_NONBLOCK)){
+    int i = 0;
     while (!x10mqueue_status(x10api.mqueue)){
-      dbg("Blocking while sending message\n");
-      usleep(1000);
+//      dbg("Blocking while sending message\n");
+      usleep(delay*1000);
+      if (i++ > 10000){
+        dbg("Timeout on blocking while sending message");
+        return -EINVAL;
+      }
     }
   }
   if (ret < 0)
@@ -1072,7 +1086,7 @@ static ssize_t control_write(struct file *file,const char *ubuffer,size_t length
       if (!(file->f_flags & O_NONBLOCK)){
         while (!x10mqueue_status(x10api.mqueue)){
           dbg("Blocking while sending message\n");
-          usleep(1000);
+          usleep(delay*1000);
         }
       }
       if (ret == 0)
