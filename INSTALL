@@ -1,19 +1,10 @@
-To compile the kernel module:
+This is the quick version of how to compile and install the x10 drivers.
 
-step 1: The kernel modules will not be installed or compiled unless you 
-are running on the kernel that you intend to run the drivers with. 
-Read docs/index2.html for more or http://wish.sourceforge.net/index2.html.
+Step 1: Build the daemons, utilities, and device modules.  You can do 
+	this as a user or as root by typing "make" in the source directory.
 
-step 2: make patchkernel
-
-step 3: go to kernel source directory and rebuild the configuration
-        (make menuconfig, or make xconfig).  In the kernel configurtion
-	select "Device Drivers"
-	then select "Character devices"
-	scroll to the bottom
-	make sure that "/dev/x10 API driver" is selected to compile as a module
-
-step 4: remake your kernel and modules
+Step 2: Install the daemons, utilities, and device modules as root by 
+	typing "make install"
 
 -----------------------------------------------------------------------------
 To load the kernel module:
@@ -21,11 +12,9 @@ To load the kernel module:
 type "modprobe x10"
 
 -----------------------------------------------------------------------------
-To compile the userspace drivers:
-
-type "make"
-
 To run the userspace drivers:
 
 load the driver that is associated with your device.
 
+-----------------------------------------------------------------------------
+Follow the directions in the file html/index.html to test the drivers.
