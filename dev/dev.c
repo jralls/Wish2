@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: x10_core.c,v 1.46 2003/05/31 14:50:27 whiles Exp whiles $
+ * $Id: x10_dev.c,v 1.1 2003/11/03 00:24:54 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -65,7 +65,7 @@
 #define API_BUFFER 1024
 
 /* Here are some module parameters and definitions */
-int debug = 0;
+int debug = 1;
 MODULE_PARM (debug, "i");
 MODULE_PARM_DESC (debug, "turns on debug information (default=0)");
 
@@ -90,7 +90,7 @@ MODULE_PARM_DESC (data_major, "Major character device for communicating with ind
 MODULE_PARM (control_major, "i");
 MODULE_PARM_DESC (control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: x10_core.c,v 1.46 2003/05/31 14:50:27 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: x10_dev.c,v 1.1 2003/11/03 00:24:54 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
@@ -181,7 +181,6 @@ int __init
 x10_init (void)
 {
   int i;
-  int ret;
 // these are used only if DEVFS is available
   int j;
   char devname[16];
@@ -339,8 +338,8 @@ static unsigned int x10_data_poll (struct file *file, poll_table * pt)
 {
   int minor = XMINOR (file);
   int major = XMAJOR(file);
-  int housecode = HOUSECODE (minor);
-  int unit = UNITCODE (minor);
+  int hc = HOUSECODE(minor);
+  int uc = UNITCODE (minor);
 
   ANNOUNCE;
   dbg ("major=%d, minor=%d", major, minor);
@@ -352,19 +351,16 @@ static unsigned int x10_data_poll (struct file *file, poll_table * pt)
 //    return (POLLIN | POLLRDNORM | POLLWRNORM | POLLOUT);
 //  else
 //    return (POLLWRNORM | POLLOUT);
-//  return (POLLERR);
+  return (POLLERR);
 }
 
 static ssize_t x10_data_read (struct file *file, char *buffer, size_t length, loff_t * offset)
 {
   int minor = XMINOR (file);
   int major = XMAJOR (file);
-  int housecode = HOUSECODE (minor);
-  int unit = UNITCODE (minor);
-  char tbuffer[5];
+  int hc = HOUSECODE (minor);
+  int uc = UNITCODE (minor);
   ssize_t ret = 0;
-
-  unsigned char *lastvalue = (unsigned char *) &file->private_data;
 
   ANNOUNCE;
   dbg ("major=%d, minor=%d", major, minor);
@@ -380,11 +376,8 @@ static ssize_t x10_data_write (struct file *file, const char *ubuffer, size_t le
 {
   int minor = XMINOR (file);
   int major = XMAJOR (file);
-  int housecode = HOUSECODE (minor);
-  int unit = UNITCODE (minor);
-  int cmd = -1, pdim = 0, i;
-  ssize_t ret = 0;
-  char *buffer;
+  int hc = HOUSECODE (minor);
+  int uc = UNITCODE (minor);
 
   ANNOUNCE;
   dbg ("major=%d, minor=%d", major, minor);
@@ -401,7 +394,7 @@ static loff_t x10_data_llseek (struct file *file, loff_t offset, int origin)
 {
   int minor = XMINOR (file);
   int major=XMAJOR(file);
-  int action = HOUSECODE (minor);
+  int action = HOUSECODE(minor);
   int target = UNITCODE(minor);
 
   ANNOUNCE;
