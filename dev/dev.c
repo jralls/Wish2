@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.10 2004/01/14 03:16:11 whiles Exp whiles $
+ * $Id: dev.c,v 1.11 2004/01/16 16:33:22 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.10 2004/01/14 03:16:11 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.11 2004/01/16 16:33:22 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
@@ -158,6 +158,22 @@ dumphex (void *data, int len)
   }
   *pbuf++ = '\0';
   return hexbuffer;
+}
+
+void usleep(int usec)
+{
+  int cs;
+  if (usec < 600)
+    udelay(usec);
+  else if (usec*HZ < 2<<19)
+    for (;usec>0;usec-=500) 
+      udelay((usec>500)?500:usec);
+  else {
+    cs = current->state;
+    current->state=TASK_INTERRUPTIBLE;
+    schedule_timeout((long)((usec*HZ)>>19));
+    current->state = cs;
+  }
 }
 
 // ************************************************************************
@@ -806,6 +822,17 @@ static int x10mqueue_get(x10mqueue_t *q,x10_message_t *m)
   return ret;
 }
 
+static int x10mqueue_status(x10mqueue_t *q)
+{
+  int head,tail;
+
+  spin_lock(&q->spinlock);
+  tail = atomic_read(&q->tail);
+  head = atomic_read(&q->head);
+  spin_unlock(&q->spinlock);
+  return (head == tail);
+}
+
 static int x10mqueue_test(x10mqueue_t *q)
 {
   int ret;
@@ -957,6 +984,12 @@ static ssize_t data_write(struct file *file,const char *ubuffer,size_t length, l
   }
   else 
     ret = x10mqueue_add(x10api.mqueue,X10_DATA,hc,uc,cmd,0);
+  if (!(file->f_flags & O_NONBLOCK)){
+    while (!x10mqueue_status(x10api.mqueue)){
+      dbg("Blocking while sending message\n");
+      usleep(1000);
+    }
+  }
   if (ret < 0)
     return ret;
   return length;
@@ -1032,6 +1065,12 @@ static ssize_t control_write(struct file *file,const char *ubuffer,size_t length
       }
       ret = x10mqueue_add(x10api.mqueue,X10_CONTROL,target,-1,cmd,0);
       kfree(tbuffer);
+      if (!(file->f_flags & O_NONBLOCK)){
+        while (!x10mqueue_status(x10api.mqueue)){
+          dbg("Blocking while sending message\n");
+          usleep(1000);
+        }
+      }
       if (ret == 0)
         return length;
       else
