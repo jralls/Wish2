@@ -1,0 +1,18 @@
+$Id: CREDITS,v 1.2 2002/11/29 18:34:20 root Exp $
+
+The need for a transceiver agnostic driver for Linux would likely have not
+been recognized had heyu (www.heyu.org) been created for the CM11A.
+
+Dr. Pete Whiting created the concept of mapping the units of a X10 network to 
+/dev character devices.
+
+The book "Linux Device Drivers, 2nd Edition" by Alessandro Rubini, Jonathan 
+Corbet was by far the most useful resource for this project.
+
+
+And, thanks to Sprint for laying me off and giving me 6 months of severance
+pay and a non-compete that gave me the time to do the work to develop the code.
+
+The X10 drivers were created by Scott Hiles
+Copyright (c) 2002 - Scott Hiles
+
