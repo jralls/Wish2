@@ -12,7 +12,8 @@ fi
 WISHVER="$1"
 KERNEL="$2"
 
-BUILDDIR="/tmp/$KERNEL-buildroot"
+BUILDDIR="/tmp/$KERNEL-src"
+BUILDROOT="/tmp/$KERNEL-buildroot"
 rm -rf $BUILDDIR
 mkdir -p $BUILDDIR
 tar cf - . | (cd $BUILDDIR; tar xf -)
@@ -26,7 +27,7 @@ Version: $WISHVER
 Release: 0
 Copyright:  GPL
 Group:  System Environment/Kernel
-BuildRoot: $BUILDDIR
+BuildRoot: $BUILDROOT
 Vendor:  Scott Hiles (wsh@sprintmail.com)
 
 %description
@@ -35,15 +36,15 @@ Device drivers for PowerLinc USB, PowerLinc Serial, CM11A, and CM17A X10 transce
 %prep
 
 %build
-cd \$RPM_BUILD_ROOT
-make KERNELDIR=/usr/src/linux-$KERNEL
+cd $BUILDDIR
+make KERNELDIR=/usr/src/linux-$KERNEL CONFIG_MODVERSIONS=""
 
 %install
-cd \$RPM_BUILD_ROOT
+cd $BUILDDIR
 mkdir -p \$RPM_BUILD_ROOT/usr/share/doc/wish-$WISHVER
 cp html/* \$RPM_BUILD_ROOT/usr/share/doc/wish-$WISHVER
-mkdir -p \$RPM_BUILD_ROOT/lib/modules/$KERNEL/kernel/drivers/char/x10
-cp x10_plusb.o x10_pl.o x10_cm11a.o x10_cm17a.o \$RPM_BUILD_ROOT/lib/modules/$KERNEL/kernel/drivers/char/x10/
+mkdir -p \$RPM_BUILD_ROOT/usr/local/lib/modules/$KERNEL/kernel/drivers/char/x10
+cp x10_plusb.o x10_pl.o x10_cm11a.o x10_cm17a.o \$RPM_BUILD_ROOT/usr/local/lib/modules/$KERNEL/kernel/drivers/char/x10/
 mkdir -p \$RPM_BUILD_ROOT/usr/local/etc/
 cp example_scripts/x10.cm11a.sh \$RPM_BUILD_ROOT/usr/local/etc/x10_cm11a
 cp example_scripts/x10.cm17a.sh \$RPM_BUILD_ROOT/usr/local/etc/x10_cm17a
@@ -57,6 +58,8 @@ install -o root utils/x10attach \$RPM_BUILD_ROOT/usr/sbin/x10attach
 install -o root utils/x10logd \$RPM_BUILD_ROOT/usr/sbin/x10logd
 install -o root utils/nbread \$RPM_BUILD_ROOT/usr/bin/nbread
 install -o root utils/x10watch \$RPM_BUILD_ROOT/usr/bin/x10watch
+mkdir -p \$RPM_BUILD_ROOT/etc/logrotate.d
+install -o root scripts/logrotate.d/x10 \$RPM_BUILD_ROOT/etc/logrotate.d/x10
 mkdir -p \$RPM_BUILD_ROOT/dev/x10
 ./scripts/makedev.sh 120 121 \$RPM_BUILD_ROOT/dev/x10
 
@@ -64,8 +67,8 @@ mkdir -p \$RPM_BUILD_ROOT/dev/x10
 /tmp/makedev.sh
 
 %clean
-cd \$RPM_BUILD_ROOT
-make clean
+rm -rf $BUILDDIR
+rm -rf \$RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
@@ -73,17 +76,18 @@ make clean
 /usr/sbin/x10logd
 /usr/bin/nbread
 /usr/bin/x10watch
-/lib/modules/$KERNEL/kernel/drivers/char/x10/x10_plusb.o
-/lib/modules/$KERNEL/kernel/drivers/char/x10/x10_pl.o
-/lib/modules/$KERNEL/kernel/drivers/char/x10/x10_cm11a.o
-/lib/modules/$KERNEL/kernel/drivers/char/x10/x10_cm17a.o
+/usr/local/lib/modules/$KERNEL/kernel/drivers/char/x10/x10_plusb.o
+/usr/local/lib/modules/$KERNEL/kernel/drivers/char/x10/x10_pl.o
+/usr/local/lib/modules/$KERNEL/kernel/drivers/char/x10/x10_cm11a.o
+/usr/local/lib/modules/$KERNEL/kernel/drivers/char/x10/x10_cm17a.o
 /usr/local/etc/x10_cm11a
 /usr/local/etc/x10_cm17a
 /usr/local/etc/x10_plusb
 /usr/local/etc/x10_pl
 /usr/share/doc/wish-$WISHVER/*
+/etc/logrotate.d/x10
 /tmp/makedev.sh
 END_OF_SPEC
 
 echo "... building RPM package"
-rpm -bb x10.spec
+rpmbuild -bb x10.spec
