@@ -1,9 +1,9 @@
-#ifndef __X10_H__
-#define __X10_H__
+#ifndef __X10_DEV_H__
+#define __X10_DEV_H__
 
 /*
  *
- * $Id: x10.h,v 1.24 2003/05/30 02:57:17 whiles Exp whiles $
+ * $Id: x10_dev.h,v 1.1 2003/11/03 00:25:10 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
