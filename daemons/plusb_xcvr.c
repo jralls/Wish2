@@ -1,6 +1,6 @@
 /*
  *
- * $Id: plusb_xcvr.c,v 1.5 2004/02/21 02:22:09 whiles Exp whiles $
+ * $Id: plusb_xcvr.c,v 1.6 2004/06/27 18:18:45 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -56,6 +56,13 @@
 #include <asm/types.h>
 
 #include <linux/usbdevice_fs.h>
+
+#ifndef LINUX_VERSION_CODE
+#include <linux/version.h>
+#endif
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
+#define HID_MAX_USAGES 2
+#endif
 #include <linux/hiddev.h>
 
 #include "x10.h"
