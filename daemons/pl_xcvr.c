@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.5 2004/01/16 17:52:14 whiles Exp whiles $
+ * $Id: pl_xcvr.c,v 1.6 2004/01/16 23:17:31 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -62,7 +62,6 @@
 int transmit(int hc, int uc, int cmd);
 static void start();
 int serial=0;
-int debug=0;
 
 int readchar(int fd, unsigned char *c, int timeout)
 {
@@ -119,7 +118,6 @@ int xmit_init(struct xcvrio *arg)
   io = arg;
   io->status = 1;
   io->send = transmit;
-  debug = io->debug;
   // Now, connect up and set the status to 0 if successful.  Finally, post to the semaphore to let
   // the parent know that all is well...then just wait for input from the device...
   serial = open(io->device,O_RDWR | O_NOCTTY | O_NONBLOCK);
@@ -322,12 +320,14 @@ int transmit(int hc, int uc, int cmd)
   }
   if (startup()) {
     syslog(LOG_INFO,"unable to communicate with PowerLinc Transceiver\n");
-    return -1;
+    ret = -1;
+    goto done;
   }
   dsyslog(LOG_INFO,"sending %s\n",dumphex(scratch,(void *)data,sizeof(data)));
   ret = write(serial,data,sizeof(data));
   dsyslog(LOG_INFO,"sleeping for %d microseconds\n",delay);
   usleep(delay*1000);
+done:
   sem_post(&cts);			// enable transmitter
   return ret;
 }
