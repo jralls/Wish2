@@ -1,19 +1,50 @@
+#ifndef __X10_H__
+#define __X10_H__
 
-// These are indexes into an array for the commands for the transciever
-#define X10_CMD_ALLUNITSOFF     0
-#define X10_CMD_ALLLIGHTSON     1
-#define X10_CMD_ON              2
-#define X10_CMD_OFF             3
-#define X10_CMD_DIM             4
-#define X10_CMD_BRIGHT          5
-#define X10_CMD_ALLLIGHTSOFF    6
-#define X10_CMD_EXTENDEDCODE    7
-#define X10_CMD_HAILREQUEST     8
-#define X10_CMD_PRESETDIMHIGH   9
-#define X10_CMD_PRESETDIMLOW    10
-#define X10_CMD_EXTENDEDDATAA   11
-#define X10_CMD_STATUSON        12
-#define X10_CMD_STATUSOFF       13
-#define X10_CMD_STATUS          14
-#define X10_CMD_HAILACKNOWLEDGE 15
-#define X10_CMD_END             16
+#define MESSAGE_QUEUE_SIZE	16
+
+typedef struct x10message {
+  __u8		type;		// COMMAND=1, DATA=2
+  __u8		housecode;	// 0-16
+  __u8		unitcode;	// 0-16
+  __u8		command;	// see X10_CMD_* below
+  __u32		flag;		// flags (see below)
+} x10_message_t;
+
+typedef struct x10mqueue {
+  atomic_t	head;
+  atomic_t	tail;
+  spinlock_t    spinlock;
+  x10_message_t	queue[MESSAGE_QUEUE_SIZE];
+} x10mqueue_t;
+
+// Values for the type field
+#define X10_CMD			0x01
+#define X10_DATA		0x02
+#define X10_API			0x04
+
+// Values for command field
+#define X10_CMD_ALLUNITSOFF     0x0
+#define X10_CMD_ALLLIGHTSON     0x1
+#define X10_CMD_ON              0x2
+#define X10_CMD_OFF             0x3
+#define X10_CMD_DIM             0x4
+#define X10_CMD_BRIGHT          0x5
+#define X10_CMD_ALLLIGHTSOFF    0x6
+#define X10_CMD_EXTENDEDCODE    0x7
+#define X10_CMD_HAILREQUEST     0x8
+#define X10_CMD_PRESETDIMHIGH   0x9
+#define X10_CMD_PRESETDIMLOW    0xa
+#define X10_CMD_EXTENDEDDATAA   0xb
+#define X10_CMD_STATUSON        0xc
+#define X10_CMD_STATUSOFF       0xd
+#define X10_CMD_STATUS          0xe
+#define X10_CMD_HAILACKNOWLEDGE 0xf
+
+// Values for flag field
+#define X10_FLAG_LLSEEK		0x10	// flag to contain seek info
+#define X10_FLAG_POLL		0x11	// determines if data is available
+
+#define X10_FLAG_NONBLOCK	0x00000001
+
+#endif
