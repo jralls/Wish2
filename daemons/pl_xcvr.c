@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.4 2004/01/16 16:27:27 whiles Exp whiles $
+ * $Id: pl_xcvr.c,v 1.5 2004/01/16 17:52:14 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -301,8 +301,10 @@ int transmit(int hc, int uc, int cmd)
   char scratch[40];
 
   dsyslog(LOG_INFO,"transmit:  hc=0x%x, uc=0x%x, fc=0x%x\n",hc,uc,cmd);
-  if (cmd >= X10_CMD_END)
+  if (cmd >= X10_CMD_END){
+    dsyslog(LOG_INFO,"transmit:  invalid fc\n");
     return 1;
+  }
   hc &= 0x0f;
   memset(data,0,sizeof(data));
   i = 0;
@@ -373,17 +375,28 @@ static void decode(unsigned char *buf, int count)
 static void start()
 {
   int n;
-  int index=0;
+  int index=0,flags;
   unsigned char buf[48],c;
 
+// set the device into blocking mode now
+//  fcntl....
+  flags = fcntl(serial,F_GETFL);
+  flags &= ~O_NONBLOCK;
+  fcntl(serial,F_SETFL,flags);
   while (1) {
     c = 0;
-    if (!readchar(serial,&c,50)){
+//    if (!readchar(serial,&c,50)){
+    flags = read(serial,&c,1);
+    if (flags > 0){
       buf[index++] = c;
       if (index >= sizeof(buf) || c == X10_PL_CR) {
         decode(buf,index);
         index = 0;
       }
+    }
+    else if (flags < 0){
+      syslog(LOG_INFO,"ERROR:  read error (%s)\n",strerror(errno));
+      exit (-1);
     }
   }
 }
