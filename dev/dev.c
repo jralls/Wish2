@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.19 2004/07/05 03:13:13 whiles Exp whiles $
+ * $Id: dev.c,v 1.20 2005/01/24 01:08:39 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -9,7 +9,7 @@
  *
  */
 
-#define DISTRIBUTION_VERSION "X10 DEV module v2.0.0 (wsh@sprintmail.com)"
+#define DISTRIBUTION_VERSION "X10 DEV module v2.1.0 (wsh@sprintmail.com)"
 
 /* 
    This module is free software; you can redistribute it and/or
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.19 2004/07/05 03:13:13 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.20 2005/01/24 01:08:39 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 static int delay=1;
 
