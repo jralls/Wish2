@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.18 2004/06/27 18:50:24 whiles Exp whiles $
+ * $Id: dev.c,v 1.19 2004/07/05 03:13:13 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.18 2004/06/27 18:50:24 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.19 2004/07/05 03:13:13 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 static int delay=1;
 
@@ -605,11 +605,12 @@ static int x10_open (struct inode *inode, struct file *file)
     init_waitqueue_head(&x10api.mqueue->apiq);
   }
   else if (major == x10api.control_major) {
+    x10controlio_t *ctrl;
     if (x10api.us_connected != 1){
       dbg("%s","/dev device opened without userspace connection");
       return -EFAULT;
     }
-    x10controlio_t *ctrl = (x10controlio_t *)kmalloc(sizeof(x10controlio_t),GFP_KERNEL);
+    ctrl = (x10controlio_t *)kmalloc(sizeof(x10controlio_t),GFP_KERNEL);
     file->private_data = (void *)ctrl;
     memset(ctrl,0,sizeof(x10controlio_t));
     atomic_set(&ctrl->changed,1);
@@ -624,11 +625,12 @@ static int x10_open (struct inode *inode, struct file *file)
     }
   }
   else if (major == x10api.data_major){
+    x10dataio_t *data;
     if (x10api.us_connected != 1){
       dbg("%s","/dev device opened without userspace connection");
       return -EFAULT;
     }
-    x10dataio_t *data = (x10dataio_t *)kmalloc(sizeof(x10dataio_t),GFP_KERNEL);
+    data = (x10dataio_t *)kmalloc(sizeof(x10dataio_t),GFP_KERNEL);
     file->private_data = (void *)data;
     atomic_set(&data->changed,1);
     atomic_set(&data->value,0);
