@@ -1,6 +1,6 @@
 /*
  *
- * $Id: cm11a_xcvr.c,v 1.2 2004/02/19 04:48:54 whiles Exp whiles $
+ * $Id: cm11a_xcvr.c,v 1.3 2004/02/21 02:21:20 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -347,7 +347,7 @@ static int sem_wait_timeout(sem_t *sem,int timeout)
 {
   int i;
 
-  dsyslog(LOG_INFO,"sem_wait_timeout: timeout %d\n",timeout);
+  dsyslog(LOG_INFO,"sem_wait_timeout: timeout=%d\n",timeout);
   for (i = 0; i < timeout; i++) {
     if (sem_trywait(sem) != 0) 
       return 0;
