@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.11 2004/01/17 20:51:07 whiles Exp whiles $
+ * $Id: main.c,v 1.12 2004/02/21 02:21:43 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -104,6 +104,7 @@ int main(int argc,char *argv[])
   memset(&state,0,sizeof(state));
   progname = basename(argv[0]);
   logtag = progname;
+  dprintf("argc = %d\n",argc);
   for (i = 1; i < argc; i++) {
     arg = argv[i];
     dprintf("Argument %d: %s\n",i,&arg[1]);
@@ -113,28 +114,37 @@ int main(int argc,char *argv[])
     } else if (!strcasecmp(&arg[1],"api")) {
       TESTNEXTARG;
       device = argv[++i];
+      dprintf("%s, API set to %s\n",progname,device);
     } else if (!strcasecmp(&arg[1],"fakereceive")) {
       fakereceive = 1;
+      dprintf("%s, fakereceive turned on\n",progname);
     } else if (!strcasecmp(&arg[1],"debug")) {
       debug = 1;
+      dprintf("%s, debug turned on\n",progname);
     } else if (!strcasecmp(&arg[1],"pid")) {
       TESTNEXTARG;
       pidfile = argv[++i];
+      dprintf("%s, PID file set to %s\n",progname,pidfile);
     } else if (!strcasecmp(&arg[1],"tag")) {
       TESTNEXTARG;
       logtag = argv[++i];
+      dprintf("%s, logtag set to %s\n",progname,logtag);
     } else if (!strcasecmp(&arg[1],"device")) {
       TESTNEXTARG;
       serial = argv[++i];
+      dprintf("%s, serial set to %s\n",progname,serial);
     } else if (!strcasecmp(&arg[1],"retries")) {
       TESTNEXTARG;
       retries = atoi(argv[++i]);
+      dprintf("%s, retries set to %d\n",progname,retries);
     } else if (!strcasecmp(&arg[1],"delay")) {
       TESTNEXTARG;
       delay = atoi(argv[++i]);
+      dprintf("%s, delay set to %s\n",progname,delay);
     } else if (!strcasecmp(&arg[1],"timeout")) {
       TESTNEXTARG;
       timeout = atoi(argv[++i]);
+      dprintf("%s, timeout set to %s\n",progname,timeout);
     } else {
       syntax(argc,argv,i);
       exit (-1);
@@ -144,6 +154,7 @@ int main(int argc,char *argv[])
     dprintf("No device specified.  Must have -device <device> present\n");
     exit (-1);
   }
+  dprintf("OK...let's start\n");
   start();
   return -1;
 }
@@ -158,6 +169,7 @@ void start()
   // first open up the syslog
   openlog(logtag,LOG_NDELAY | LOG_PID,syslog_facility);
 
+  dprintf("%s opening %s for API\n",progname,device);
   api = open(device,O_RDWR);
   if (api < 0) {
     char obuffer[256];
@@ -245,7 +257,7 @@ void syntax(int argc, char *argv[], int i)
   fprintf(stderr,"         -api device  - X10 device driver api file (default: %s)\n",defdevice);
   fprintf(stderr,"         -pid pidfile - File to write driver PID to (default: %s)\n",defpidfile);
   fprintf(stderr,"         -tag logtag  - Tag to be written to syslog (default: %s)\n",progname);
-  fprintf(stderr,"         -timeout #   - Timeout while waiting for response from api (default: 10)\n");
+  fprintf(stderr,"         -timeout #   - Timeout while waiting for response from api (default: %d)\n",timeout);
   fprintf(stderr,"         -retries #   - Number of times to retry on failure (default: %d)\n",retries);
   fprintf(stderr,"         -delay #     - Number of seconds to delay after failure (default: %d)\n",delay);
   fprintf(stderr,"         -fakereceive - Loop transmitted information back to receiver\n");
