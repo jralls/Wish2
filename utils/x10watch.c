@@ -1,6 +1,6 @@
 /*
  *
- * $Id: x10watch.c,v 1.3 2003/02/24 17:20:40 whiles Exp whiles $
+ * $Id: x10watch.c,v 1.1 2004/01/10 16:34:07 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -59,7 +59,8 @@ static int timedelay = 0;
 #ifdef dbg
 #undef dbg
 #endif
-#define dbg(format, arg...) if (debug) printf("%s/%d/%s(): " format "\n",__FILE__, __FUNCTION__ , __LINE__, ## arg)
+//#define dbg(format, arg...) if (debug) printf("%s/%d/%s(): " format "\n",__FILE__, __FUNCTION__ , __LINE__, ## arg)
+#define dbg if(debug) printf
 
 #define TEST2NDARG if (i+2 > argc) { syntax(argc,argv,0); exit(1); }
 
@@ -128,7 +129,7 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-	dbg("watching %s, interval=%d, on=%s, off=%s",device,interval,action_on,action_off);
+	dbg("watching %s, interval=%d, on=%s, off=%s\n",device,interval,action_on,action_off);
 	// OK...we know what to do...now do it
 	
 	fd = open(device,O_RDONLY);
@@ -145,31 +146,31 @@ int main(int argc, char *argv[])
 
 static int watch() 
 {
-	char data[10];
+	char data[100];
 	int i,sysret,currentstatus,newstatus;
 
 	memset(data,0,sizeof(data));
 	i = read(fd,data,sizeof(data));
-	dbg("data=%s",data);
+	dbg("data=%s\n",data);
 	if (i < 0) {
 		fprintf(stderr,"%s: error reading device %s (%s)\n",progname,device,strerror(errno));
 		return i;
 	}
 	if (data[5]) {	// test to see if we got extra stuff (reading control dev)
-		fprintf(stderr,"%s: error - device must be a single device\n");
+		fprintf(stderr,"%s: error - invalid data \'%s\'\n",progname,data);
 		return (1);
 	}
 	currentstatus = atoi(data);
-	dbg("currentstatus=%d",currentstatus);
+	dbg("currentstatus=%d\n",currentstatus);
 	if (currentstatus != 0)
 		currentstatus = 1;
 	while (1) {
-		dbg("Waiting for data from %s...",device);
+		dbg("Waiting for data from %s...\n",device);
 		i = read(fd,data,sizeof(data));	// this blocks
 		newstatus = atoi(data);
 		if (newstatus != 0)		// dim levels = on
 			newstatus = 1;
-		dbg("currentstatus=%d, newstatus=%d",currentstatus,newstatus);
+		dbg("currentstatus=%d, newstatus=%d\n",currentstatus,newstatus);
 		if (newstatus == currentstatus) 
 			continue;
 		currentstatus = newstatus;
@@ -182,12 +183,12 @@ static int watch()
 				continue;
 		}
 		if (newstatus && action_on){
-			dbg("executing %s",action_on);
+			dbg("executing %s\n",action_on);
 			sysret = system(action_on);
 			sleep(timedelay);
 		}
 		else if (!newstatus && action_off){
-			dbg("executing %s",action_off);
+			dbg("executing %s\n",action_off);
 			sysret = system(action_off);
 			sleep(timedelay);
 		}
