@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.7 2004/01/04 19:36:31 whiles Exp whiles $
+ * $Id: dev.c,v 1.8 2004/01/05 00:42:04 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.7 2004/01/04 19:36:31 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.8 2004/01/05 00:42:04 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
@@ -111,7 +111,9 @@ static ssize_t control_write(struct file *file,const char *buffer,size_t length,
 static loff_t control_llseek(struct file *file, loff_t offset, int origin);
 static int x10mqueue_get(x10mqueue_t *q,x10_message_t *m);
 static int x10mqueue_add(x10mqueue_t *q,__u8 source,__u8 hc, __u8 uc, __u8 cmd, __u32 f);
-static ssize_t x10_api_write(x10_message_t *message,x10mqueue_t *q);
+static int x10mqueue_test(x10mqueue_t *q);
+static ssize_t api_write(x10_message_t *message,x10mqueue_t *q);
+static ssize_t api_read(struct file *file,char *buffer,size_t length, loff_t * offset);
 
 struct file_operations device_fops = {
 	owner:		THIS_MODULE,
@@ -571,6 +573,7 @@ static int x10_open (struct inode *inode, struct file *file)
     atomic_set(&x10api.mqueue->tail,0);
     spin_lock_init(&x10api.mqueue->spinlock);
     init_waitqueue_head(&x10api.mqueue->wq);
+    init_waitqueue_head(&x10api.mqueue->apiq);
   }
   else if (major == x10api.control_major) {
     if (x10api.us_connected != 1){
@@ -696,17 +699,8 @@ static ssize_t x10_read (struct file *file, char *ubuffer, size_t length, loff_t
   }
 
   if (major == x10api.control_major && hc == X10_CONTROL_API){
-    x10_message_t m;
     // called from the userspace driver
-    if (length < sizeof(x10_message_t)) {
-	dbg("%s","error:  Invalid message size");
-	return -EFAULT;
-    }
-    if (x10mqueue_get((x10mqueue_t *)file->private_data,&m))
-      return -EFAULT;
-    if (copy_to_user(ubuffer,&m,sizeof(x10_message_t))) 
-	return -EFAULT;
-    return(sizeof(x10_message_t));
+    return(api_read(file,ubuffer,length,offset));
   }
   else if (major == x10api.control_major) {
     // called from the /dev/x10/* character devices
@@ -726,7 +720,6 @@ static ssize_t x10_write (struct file *file, const char *ubuffer, size_t length,
   int major = XMAJOR (file);
   int hc = HOUSECODE (minor);
 //  int uc = UNITCODE (minor);
-  x10_message_t message;
 
   ANNOUNCE;
   dbg ("major=%d, minor=%d", major, minor);
@@ -735,16 +728,17 @@ static ssize_t x10_write (struct file *file, const char *ubuffer, size_t length,
   else
     dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
 
-  if (length < sizeof(message)) {
-    dbg("%s","error:  Invalid message size");
-    return -EFAULT;
-  }
-  if (copy_from_user(&message,ubuffer,sizeof(message)))
-    return -EFAULT;
 
   if (major == x10api.control_major && hc == X10_CONTROL_API){
+    x10_message_t message;
+    if (length < sizeof(message)) {
+      dbg("%s","error:  Invalid message size");
+      return -EFAULT;
+    }
+    if (copy_from_user(&message,ubuffer,sizeof(message)))
+      return -EFAULT;
     // this comes from the userspace daemon
-    return(x10_api_write(&message,(x10mqueue_t *)file->private_data));
+    return(api_write(&message,(x10mqueue_t *)file->private_data));
   }
   else if (major == x10api.control_major) {
     // this comes from the /dev/x10/* character devices
@@ -763,6 +757,7 @@ static int x10mqueue_add(x10mqueue_t *q,__u8 source,__u8 hc, __u8 uc, __u8 cmd, 
   int head,tail,ret=1;
   x10_message_t *message;
 
+  ANNOUNCE;
   spin_lock(&q->spinlock);
 
   tail = atomic_read(&q->tail);
@@ -780,6 +775,9 @@ static int x10mqueue_add(x10mqueue_t *q,__u8 source,__u8 hc, __u8 uc, __u8 cmd, 
     atomic_set(&q->tail,tail);
     ret = 0;
   }
+  dbg("source=%x, hc=%x, uc=%x, cmd=%x, f=%x, pos=%d",source,hc,uc,cmd,f,tail);
+  if (waitqueue_active(&x10api.mqueue->apiq))
+    wake_up_interruptible(&x10api.mqueue->apiq);
   spin_unlock(&q->spinlock);
   return ret;
 }
@@ -794,21 +792,34 @@ static int x10mqueue_get(x10mqueue_t *q,x10_message_t *m)
   tail = atomic_read(&q->tail);
   head = atomic_read(&q->head);
   if (head != tail) {
+    ANNOUNCE;
     message = &q->queue[head];
     if (++head >= MESSAGE_QUEUE_SIZE)
       head = 0;
     atomic_set(&q->head,head);
     memcpy(m,message,sizeof(x10_message_t));
     ret = 0;
+    dbg("source=%x, hc=%x, uc=%x, cmd=%x, f=%x, pos=%d",m->source,m->housecode,m->unitcode,m->command,m->flag,head);
   }
   spin_unlock(&q->spinlock);
-  return 1;
+  return ret;
 }
 
-ssize_t x10_api_write(x10_message_t *message,x10mqueue_t *q)
+static int x10mqueue_test(x10mqueue_t *q)
+{
+  int ret;
+
+  spin_lock(&q->spinlock);
+  ret = atomic_read(&q->tail) == atomic_read(&q->head) ? 0 : 1;
+  spin_unlock(&q->spinlock);
+  return ret;
+}
+
+ssize_t api_write(x10_message_t *message,x10mqueue_t *q)
 {
   int value;
 
+  ANNOUNCE;
   switch (message->source) {
     case X10_API:
 	if (message->command == X10_CMD_STATUS) {
@@ -836,6 +847,31 @@ ssize_t x10_api_write(x10_message_t *message,x10mqueue_t *q)
       break;
   }
   return -EFAULT;
+}
+
+static ssize_t api_read(struct file *file,char *ubuffer,size_t length, loff_t * offset)
+{
+  x10_message_t m;
+
+  ANNOUNCE;
+  if (length < sizeof(x10_message_t)) {
+    dbg("%s","error:  Invalid message size");
+    return -EFAULT;
+  }
+  if (!x10mqueue_test((x10mqueue_t *)file->private_data)) {
+    if (file->f_flags & O_NONBLOCK)
+      return 0;
+    else{
+      if (wait_event_interruptible(x10api.mqueue->apiq,x10mqueue_test((x10mqueue_t *)file->private_data)))
+        return 0;
+      *offset = 0;
+    }
+  }
+  if (x10mqueue_get((x10mqueue_t *)file->private_data,&m))
+    return -EFAULT;
+  if (copy_to_user(ubuffer,&m,sizeof(x10_message_t))) 
+    return -EFAULT;
+  return(sizeof(x10_message_t));
 }
 
 static ssize_t data_read(struct file *file,char *buffer,size_t length, loff_t * offset)
