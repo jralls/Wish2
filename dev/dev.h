@@ -3,7 +3,7 @@
 
 /*
  *
- * $Id: x10_dev.h,v 1.4 2004/01/01 21:34:09 whiles Exp whiles $
+ * $Id: dev.h,v 1.5 2004/01/03 20:39:59 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -117,6 +117,7 @@ typedef struct x10dataio {
 
 typedef struct x10controlio {
   atomic_t	changed;
+  unsigned char	values[MAX_HOUSECODES*MAX_UNITS];
 } x10controlio_t;
 
 #endif				// #ifdef __X10_MODULE__

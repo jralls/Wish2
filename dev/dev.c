@@ -223,6 +223,156 @@ static unsigned int getstatus(int hc, int uc,int reset)
   return ret;
 }
 
+static int unitchanged(int hc, int uc, atomic_t *value)
+{
+  if (getstatus(hc,uc,0) != atomic_read(value))
+    return 1;
+  return 0;
+}
+
+static int housecodechanged(int hc,unsigned char *values)
+{
+  int i;
+
+  for (i = 0; i < MAX_UNITS; i++)
+    if (getstatus(hc,i,0) != values[i])
+      return 1;
+  return 0;
+}
+
+static int anychanged(unsigned char *values)
+{
+  int i, j;
+
+  for (i = 0; i < MAX_HOUSECODES; i++)
+    for (j = 0; j < MAX_UNITS; j++)
+      if (getstatus(i,j,0) != values[i*MAX_HOUSECODES+j])
+        return 1;
+  return 0;
+}
+
+// status display for a single housecode or all housecodes uses the same header
+static char *header =
+    "    1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16\n";
+static size_t x10_control_dumphousecode(struct file *file, char *buffer, size_t length, loff_t * offset)
+{
+  int minor = XMINOR(file);
+//  int major = XMAJOR(file);
+  int action = HOUSECODE(minor);
+  int target = UNITCODE(minor);
+  char tbuffer[4 * (MAX_UNITS + 2)];
+  char *pbuffer;
+  ssize_t ret = 0;
+  int i, addheaderline;
+  x10controlio_t *ctrl = (x10controlio_t *)file->private_data;
+
+  if (minor < 0 || minor > 0xff) {
+    err("bad minor %d",minor);
+    return 0;
+  }
+  addheaderline = (action == X10_CONTROL_HCWHDRS ? 1 : 0);
+  if ((*offset > addheaderline)) {
+    if ((file->f_flags & O_NONBLOCK) || nonblockread)
+      return 0;
+    else {  // block
+      if (wait_event_interruptible(x10api.mqueue->wq,housecodechanged(target,ctrl->values)))
+        return 0;
+      *offset = 0;
+    }
+  }
+  if (length < sizeof(tbuffer))
+    return -EINVAL;
+  if (addheaderline && *offset == 0) {
+    strcpy(tbuffer, header);
+  } else {
+    pbuffer = tbuffer;
+    if (addheaderline) {
+      *pbuffer++ = (char) ('A' + target);
+      *pbuffer++ = ':';
+      *pbuffer++ = ' ';
+    }
+    for (i = 0; i < MAX_UNITS; i++) {  // unit contains the housecod
+      sprintf(pbuffer, "%03d ", getstatus(target, i,0));
+      ctrl->values[i] = getstatus(target,i,0);
+      pbuffer = &pbuffer[4];    // next position is the 5th char
+    }
+    *pbuffer++ = '\n';
+    *pbuffer++ = '\0';
+  }
+  ret = strlen(tbuffer);
+  if (copy_to_user(buffer, tbuffer, ret + 1))
+    ret = -EFAULT;
+  else
+    ++*offset;
+  return ret;
+}
+
+static size_t x10_control_dumpstatus(struct file *file, char *buffer, size_t length, loff_t * offset)
+{
+  int minor = XMINOR(file);
+//  int major = XMAJOR(file);
+//  int action = HOUSECODE(minor);
+  int target = UNITCODE(minor);
+  char tbuffer[4 * (MAX_UNITS + 2)];
+  char *pbuffer;
+  ssize_t ret = 0;
+  int j, addheaderline, dumpchanged;
+  x10controlio_t *ctrl = (x10controlio_t *)file->private_data;
+
+  if (minor < 0 || minor > 0xff) {
+    err("bad minor %d",minor);
+    return 0;
+  }
+  addheaderline = (target & X10_CONTROL_WITHHDRS ? 1 : 0);
+  dumpchanged = (target & X10_CONTROL_READCHANGED ? 1 : 0);
+  // make sure that you display it at least once.  But, don't 
+  // display again unless there are changes.  
+  // cat < /dev/x10/a10 should return one thing.  
+  if (*offset >= (MAX_HOUSECODES + addheaderline)) {
+    // special case...if we are dumping the change log, 
+    // nothing is reset so we can't block.  When dumping 
+    // the changelong, it always acts as if it is non-blocking
+    if ((file->f_flags & O_NONBLOCK) || dumpchanged || nonblockread)
+      return 0;
+    else {  // block
+      if (wait_event_interruptible(x10api.mqueue->wq,anychanged(ctrl->values)))
+        return 0;
+      *offset = 0;
+    }
+  }
+  if (length < sizeof(tbuffer))
+    return -EINVAL;
+  if (addheaderline && *offset == 0)
+    strcpy(tbuffer, header);
+  else {
+    pbuffer = tbuffer;
+    if (addheaderline) {
+      *pbuffer++ = (char) ('A' + (*offset) - addheaderline);
+      *pbuffer++ = ':';
+      *pbuffer++ = ' ';
+    }
+    for (j = 0; j < MAX_UNITS; j++) {// unit contains the housecode
+      if (dumpchanged){
+        sprintf(pbuffer, " %d  ", getstate(*offset-addheaderline,j,0));
+      }
+      else {
+        int hc = *offset-addheaderline;
+        sprintf(pbuffer,"%03d ",getstatus(hc,j,0));
+        ctrl->values[hc*MAX_HOUSECODES+j] = getstatus(hc,j,0);
+      }
+      pbuffer = &pbuffer[4];
+    }
+    *pbuffer++ = '\n';
+    *pbuffer++ = '\0';
+  }
+  ret = strlen(tbuffer);
+  if (copy_to_user(buffer, tbuffer, ret + 1))
+    ret = -EFAULT;
+  else
+    ++ *offset;
+  return ret;
+}
+
 // ************************************************************************
 // * log management routines 
 // ************************************************************************
@@ -427,9 +577,19 @@ static int x10_open (struct inode *inode, struct file *file)
       return -EFAULT;
     x10controlio_t *ctrl = (x10controlio_t *)kmalloc(sizeof(x10controlio_t),GFP_KERNEL);
     file->private_data = (void *)ctrl;
+    memset(ctrl,0,sizeof(x10controlio_t));
     atomic_set(&ctrl->changed,1);
+    switch (hc) {
+      case X10_CONTROL_DUMPLOG:
+        file->f_pos = atomic_read(&log.begin);
+        break;
+      case X10_CONTROL_STATUS:
+      case X10_CONTROL_HCWHDRS:
+      case X10_CONTROL_HCWOHDRS:
+	break;
+    }
   }
-  else {  // if (major = x10api.control_data)
+  else if (major == x10api.data_major){
     if (x10api.us_connected != 1)
       return -EFAULT;
     x10dataio_t *data = (x10dataio_t *)kmalloc(sizeof(x10dataio_t),GFP_KERNEL);
@@ -437,6 +597,8 @@ static int x10_open (struct inode *inode, struct file *file)
     atomic_set(&data->changed,1);
     atomic_set(&data->value,0);
   }
+  else
+    return -EFAULT;
 
   return 0;
 }
@@ -468,7 +630,7 @@ static int x10_release (struct inode *inode, struct file *file)
   // free up the private data
   else if (major == x10api.control_major) {
   }
-  else {  // if (major = x10api.control_data)
+  else {  // if (major = x10api.data_major)
   }
 */
   kfree(file->private_data);
@@ -494,9 +656,19 @@ static loff_t x10_llseek(struct file *file, loff_t offset, int origin)
     return -ESPIPE;
   }
   else if (major == x10api.control_major) {
-    return(control_llseek(file,offset,origin));
+    switch (hc) {
+      case X10_CONTROL_DUMPLOG:
+        return(control_llseek(file,offset,origin));
+        break;
+      case X10_CONTROL_STATUS:
+      case X10_CONTROL_HCWHDRS:
+      case X10_CONTROL_HCWOHDRS:
+      default:
+        return -ESPIPE;
+	break;
+    }
   }
-  else {  // if (major = x10api.control_data)
+  else {  // if (major = x10api.data_major)
     return -ESPIPE;
   }
 }
@@ -651,19 +823,12 @@ ssize_t x10_api_write(x10_message_t *message,x10mqueue_t *q)
         log_store((int)message->flag,message->housecode,message->unitcode,message->command);
 	return sizeof(x10_message_t);
 	break;
-    case X10_CMD:
+    case X10_CONTROL:
     default:
       dbg("Invalid message type %x",message->source);
       break;
   }
   return -EFAULT;
-}
-
-static int unitchanged(int hc, int uc, atomic_t *lastvalue)
-{
-  if (getstatus(hc,uc,0) != atomic_read(lastvalue))
-    return 1;
-  return 0;
 }
 
 static ssize_t data_read(struct file *file,char *buffer,size_t length, loff_t * offset)
@@ -749,23 +914,88 @@ static ssize_t data_write(struct file *file,const char *ubuffer,size_t length, l
   return length;
 }
 
-static ssize_t control_read(struct file *file,char *buffer,size_t length, loff_t * offset)
+static ssize_t control_read(struct file *file,char *buffer,size_t length, loff_t *offset)
 {
-//  int minor=XMINOR(file);
-//  int major=XMAJOR(file);
-//  int action = HOUSECODE(minor);
-//  int target = UNITCODE(minor);
-  x10controlio_t *ctrl = (x10controlio_t *)file->private_data;
+  int minor=XMINOR(file);
+  int major=XMAJOR(file);
+  int action = HOUSECODE(minor);
+  int target = UNITCODE(minor);
+//  x10controlio_t *ctrl = (x10controlio_t *)file->private_data;
+
+  switch (action) {
+    case X10_CONTROL_HCWHDRS:
+    case X10_CONTROL_HCWOHDRS:
+      return(x10_control_dumphousecode(file,buffer,length,offset));
+      break;
+    case X10_CONTROL_STATUS:
+      return(x10_control_dumpstatus(file,buffer,length,offset));
+      break;
+    case X10_CONTROL_DUMPLOG:
+      if (target == 0) {
+        if ((*offset==(loff_t)atomic_read(&log.end))&(file->f_flags&O_NONBLOCK))
+          return 0;
+        if (wait_event_interruptible(log.changed,(int)*offset != (loff_t)atomic_read(&log.end)))
+          return 0;
+        return(log_get(offset,buffer,length));
+      }
+      break;
+    default:
+      err("Unknown device major=%d, minor=%d",major,minor);
+      return -EINVAL;
+      break;
+  }
   return -EINVAL;
 }
 
-static ssize_t control_write(struct file *file,const char *buffer,size_t length, loff_t * offset)
+static ssize_t control_write(struct file *file,const char *ubuffer,size_t length, loff_t * offset)
 {
-//  int minor=XMINOR(file);
+  int minor=XMINOR(file);
 //  int major=XMAJOR(file);
-//  int action = HOUSECODE(minor);
-//  int target = UNITCODE(minor);
-  x10controlio_t *ctrl = (x10controlio_t *)file->private_data;
+  int action = HOUSECODE(minor);
+  int target = UNITCODE(minor);
+  char *tbuffer;
+  int i,cmd,ret;
+//  x10controlio_t *ctrl = (x10controlio_t *)file->private_data;
+
+  switch (action) {
+    case X10_CONTROL_HCWHDRS:
+    case X10_CONTROL_HCWOHDRS:
+      if (length <= 1) return -EINVAL;
+      tbuffer = kmalloc((length+1)*sizeof(char),GFP_KERNEL);
+      if (tbuffer == NULL) return -ENOMEM;
+      if (copy_from_user(tbuffer,ubuffer,length)){
+        kfree(tbuffer);
+        return -EFAULT;
+      }
+      tbuffer[length] = '\0';
+      for (i = length-1; i >=0; i--) 
+        if (tbuffer[i] < ' ') 
+          tbuffer[i] = '\0';
+      if (strlen(tbuffer) <= 0) {
+        kfree(tbuffer);
+        return 0;
+      }
+      // now we have a clean copy of the user text string
+      if ((cmd = parse_function(tbuffer,X10_CMD_MASK_HOUSECODES)) < 0) {
+        dbg("Invalid command %s",tbuffer);
+        warn("Invalid command '%s' to %c",tbuffer,(char)target+'A');
+        kfree(tbuffer);
+        return -EINVAL;
+      }
+      ret = x10mqueue_add(x10api.mqueue,X10_CONTROL,target,-1,cmd,0);
+      kfree(tbuffer);
+      if (ret == 0)
+        return length;
+      else
+	return -EFAULT;
+      break;
+    case X10_CONTROL_STATUS:
+    case X10_CONTROL_DUMPLOG:
+    default:
+      // you can't write to the status or log devices!!!
+      return -EINVAL;
+      break;
+  }
   return -EINVAL;
 }
 
@@ -775,7 +1005,7 @@ static loff_t control_llseek(struct file *file, loff_t offset, int origin)
 //  int major=XMAJOR(file);
   int action = HOUSECODE(minor);
 //  int target = UNITCODE(minor);
-  x10controlio_t *ctrl = (x10controlio_t *)file->private_data;
+//  x10controlio_t *ctrl = (x10controlio_t *)file->private_data;
   dbg("origin=%d offset=%lld",origin,offset);
   switch(action) {
     case X10_CONTROL_DUMPLOG:
