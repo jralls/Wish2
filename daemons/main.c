@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.12 2004/02/21 02:21:43 whiles Exp whiles $
+ * $Id: main.c,v 1.13 2004/06/21 03:48:44 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -320,8 +320,12 @@ static void listen()
   int n;
   x10_message_t m;
 
-  sem_init(&xcvrio.connected,1,0);
-  sem_init(&state.lock,1,1);
+  if (sem_init(&xcvrio.connected,0,0) != 0)
+    dsyslog(LOG_INFO,"Error:  error initializing xcvrio.connected (%s)\n",strerror(errno));
+
+  if (sem_init(&state.lock,0,1) != 0)
+    dsyslog(LOG_INFO,"Error:  error initializing state.lock (%s)\n",strerror(errno));
+
   xcvrio.device = serial;
   xcvrio.logtag = logtag;
   xmitstack = malloc(CHILDSTACKSIZE);
@@ -347,6 +351,7 @@ static void listen()
   // physical device transmitter started...now listen to the api
   while (1) {
     memset(&m,0,sizeof(m));
+    dsyslog(LOG_INFO,"Waiting for input from API interface\n");
     n = read(api,&m,sizeof(m));
     if (n < 0) {
       dsyslog(LOG_INFO,"Error reading API interface - %s\n",strerror(errno));
@@ -393,6 +398,9 @@ static int updatelog(int dir, int hc, int uc, int cmd)
 
 static int updatestatus(int hc, int uc, int cmd, int value)
 {
+  int ret;
+
+  dsyslog(LOG_INFO,"Updating status.....");
   x10_message_t m;
   memset(&m,0,sizeof(m));
   m.source = X10_DATA;
@@ -402,12 +410,14 @@ static int updatestatus(int hc, int uc, int cmd, int value)
   m.flag = value;
   if (write(api,&m,sizeof(m)) == sizeof(m)){
     state.uc[hc][uc] = value;
-    return 0;
+    ret = 0;
   }
   else{
     dsyslog(LOG_INFO,"Error - write did not complete\n");
-    return -1;
+    ret = -1;
   }
+  dsyslog(LOG_INFO,"status update done.\n");
+  return ret;
 }
 
 static void clear_uc(int hc)
@@ -427,7 +437,10 @@ static int update_state(int dir, int hc, int uc, int fc,unsigned char *buf, int 
   dsyslog(LOG_INFO,"update_state:  dir=%d, hc=0x%x, uc=0x%x, fc=0x%x\n",dir,hc,uc,fc);
   hc &= 0x0f;
 
+  sem_getvalue(&state.lock,&i);
+  dsyslog(LOG_INFO,"semaphore value:  %d\n",i);
   sem_wait(&state.lock);
+  dsyslog(LOG_INFO,"Got the state lock\n");
 
   // if we get a preset dim high/low, we can store the level only if:
   //   the previous housecode was stored
@@ -529,13 +542,13 @@ static int update_state(int dir, int hc, int uc, int fc,unsigned char *buf, int 
     case X10_CMD_EXTENDEDCODE:      // extended code
       dsyslog(LOG_INFO,"extended code to housecode %c",'A'+state.hc);
       if (len > 0){
-        return -1;
+        ret = -1;
       }
       break;
     case X10_CMD_EXTENDEDDATAA:     // extended data (analog)
       dsyslog(LOG_INFO,"extended data (analog) to housecode %c", 'A' + state.hc);
       if (len > 0){
-        return -1;
+        ret = -1;
       }
       break;
     case X10_CMD_PRESETDIMHIGH:     // already handled
@@ -549,6 +562,7 @@ static int update_state(int dir, int hc, int uc, int fc,unsigned char *buf, int 
       break;
     }  // end of switch statement
   } // end of if (fc >= 0)
+  dsyslog(LOG_INFO,"Released the state lock\n");
   sem_post(&state.lock);
   return ret;
 }
