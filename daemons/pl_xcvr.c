@@ -1,6 +1,6 @@
 /*
  *
- * $Id: x10attach.c,v 1.9 2003/02/24 17:20:06 whiles Exp whiles $
+ * $Id: pl_xcvr.c,v 1.1 2004/01/11 20:33:45 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -63,8 +63,10 @@ int transmit(int hc, int uc, int cmd);
 // return a non-zero number to indicate error
 int xmit_init(struct xcvrio *io)
 {
+  io->status = 1;
   io->send = transmit;
-  io->status = 0;
+  // Now, connect up and set the status to 0 if successful.  Finally, post to the semaphore to let
+  // the parent know that all is well...then just wait for input from the device...
   sem_post(&io->connected);
   return 0;
 }
