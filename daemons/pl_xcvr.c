@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.2 2004/01/11 21:18:54 whiles Exp whiles $
+ * $Id: pl_xcvr.c,v 1.3 2004/01/14 03:16:41 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -220,9 +220,12 @@ static int waitforack(int timeout)
 {
   int i;
 
+  dsyslog(LOG_INFO,"waitforack:  timeout %d\n",timeout);
   for (i = 0; i < timeout; i++){
-    if (sem_trywait(&sem_ack) == 0)
+    if (sem_trywait(&sem_ack) == 0){
+      dsyslog(LOG_INFO,"received ACK/NAK\n");
       return ack;
+    }
     usleep(1);
   }
   return 0;
@@ -232,10 +235,46 @@ static int updateack(int value)
 {
   int data;
 
+  dsyslog(LOG_INFO,"updateack:  %d\n",value);
   ack = value;
   sem_getvalue(&sem_ack,&data);
   if (data == 0)
     sem_post(&sem_ack);
+}
+
+static int clearack()
+{
+  int data = 0;
+
+  dsyslog(LOG_INFO,"clearing ack\n");
+  do {
+    data = sem_trywait(&sem_ack);
+  } while (data == 0);
+  ack = 0;
+}
+
+int startup()
+{
+  unsigned char c;
+  int i,ack,ret;
+
+  dsyslog(LOG_INFO,"startup...\n");
+  c = X10_PL_START;
+  for (i = 0; i < retries; i++) {
+    clearack();
+    dsyslog(LOG_INFO,"sending 0x%x\n",X10_PL_START);
+    ret = write(serial,&c,1);
+    ack = waitforack(timeout);
+    if (ack == 1)
+      break;
+    else if (ack != -1)
+      return -1;
+  }
+  if (i > retries){
+    dsyslog(LOG_INFO,"Error:  timeout exceeded for startup\n");
+    return -1;
+  }
+  return 0;
 }
 
 int transmit(int hc, int uc, int cmd)
@@ -257,11 +296,19 @@ int transmit(int hc, int uc, int cmd)
   if (cmd >= 0)
     data[i++] = functioncode[cmd] | 0x40;
   data[4] = X10_PL_REPEATONCE;
-  syslog(LOG_INFO,"sending %s\n",dumphex(scratch,(void *)data,sizeof(data)));
+  if (startup()) {
+    syslog(LOG_INFO,"unable to communicate with PowerLinc Transceiver\n");
+    goto error;
+  }
+  dsyslog(LOG_INFO,"sending %s\n",dumphex(scratch,(void *)data,sizeof(data)));
   ret = write(serial,data,sizeof(data));
-  if (!waitforack(5000))
-    syslog(LOG_INFO,"timeout waiting for ACK\n");
+  if (!waitforack(timeout)){
+    dsyslog(LOG_INFO,"timeout waiting for ACK\n");
+    goto error;
+  }
   return ret;
+error:
+  return -1;
 }
 
 static void decode(unsigned char *buf, int count)
@@ -272,19 +319,20 @@ static void decode(unsigned char *buf, int count)
 
   if (!buf)
     return;
-  dsyslog(LOG_INFO,"%s", dumphex(scratch, buf, count));
+  dsyslog(LOG_INFO,"received data - decoding:  %s\n", dumphex(scratch, buf, count));
   hc = uc = fc = -1;
-  if (buf[0] == X10_PL_ACK) 
+  if (buf[0] == X10_PL_ACK) {
     updateack(1);
-
-  else if (buf[0] == X10_PL_NAK) 
+  }
+  else if (buf[0] == X10_PL_NAK) {
     updateack(-1);
-
-  else if (buf[0] == X10_PL_EXTDATASTART)        // 0x45='E'
+  }
+  else if (buf[0] == X10_PL_EXTDATASTART){        // 0x45='E'
     dsyslog(LOG_INFO,"Error:  Extended data not supported");
-
+  }
   else if (buf[0] == X10_PL_XMITRCV || buf[0] == X10_PL_XMITRCVSELF) {
     data = (struct pl_cmd *) buf;
+    dsyslog(LOG_INFO,"packet:  hc=0x%x, uc=0x%x, fc=0x%x\n",data->hc, data->uc, data->fc);
     hc = decode_housecode(data->hc & ~0x40);
     if (hc < 0 || hc >= MAX_HOUSECODES) {
       dsyslog(LOG_INFO,"invalid housecode 0x%x", data->hc);
@@ -294,6 +342,7 @@ static void decode(unsigned char *buf, int count)
     if (uc < 0) 
       fc = decode_functioncode(data->uc & ~0x40);
 
+    dsyslog(LOG_INFO,"calling receiver...\n");
     if (io->received(hc, uc, fc,NULL,0))
       dsyslog(LOG_INFO,"unknown cmd %s", dumphex(scratch,buf, count));
   }
@@ -309,6 +358,7 @@ static void start()
   unsigned char buf[48],c;
 
   while (1) {
+    c = 0;
     if (!readchar(serial,&c,50)){
       buf[index++] = c;
       if (index >= sizeof(buf) || c == X10_PL_CR) {
