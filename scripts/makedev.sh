@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: makedev.sh,v 1.1 2002/11/26 18:57:02 root Exp root $
+# $Id: makedev.sh,v 1.2 2002/11/29 01:32:59 root Exp whiles $
 #
 MAJOR_DATA=120
 MAJOR_CONTROL=121
@@ -73,3 +73,4 @@ mknod /dev/x10/changedraw c $MAJOR_CONTROL 34
 mknod /dev/x10/changed c $MAJOR_CONTROL 35
 
 mknod /dev/x10/log c $MAJOR_CONTROL 48
+mknod /dev/x10/edata c $MAJOR_CONTROL 64
