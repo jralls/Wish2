@@ -4,7 +4,7 @@
 #include <linux/types.h>
 
 #define MESSAGE_QUEUE_SIZE	16
-#define MAX_LOG 		32
+#define MAX_LOG 		512
 
 typedef struct x10message {
   int		source;		// Where did the message come from/go to
