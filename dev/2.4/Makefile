@@ -27,13 +27,15 @@ obj-m	  	:= $(O_TARGET)
 x10-objs	:= $(obj-y)
 
 KDIR	:= /lib/modules/$(shell uname -r)/build
+MDIR	:= /lib/modules/$(shell uname -r)/kernel/drivers/char/x10
 PWD	:= $(shell pwd)
 
 default:
 	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
 
-modules_install:
-	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules_install
+install:
+	mkdir -p $(MDIR)
+	cp -f $(O_TARGET) $(MDIR)
 
 clean:
 	rm -f .*.o.flags

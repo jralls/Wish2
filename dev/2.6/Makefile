@@ -24,18 +24,21 @@
 #   Should you need to contact the author, you can do so by email to
 #   <wsh@sprintmail.com>.
 #*/
+O_TARGET := x10.ko
 obj-m := x10.o
 
 x10-objs := dev.o strings.o
 
 KDIR	:= /lib/modules/$(shell uname -r)/build
+MDIR	:= /lib/modules/$(shell uname -r)/kernel/drivers/char/x10
 PWD	:= $(shell pwd)
 
 default:
 	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
 
-modules_install:
-	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules_install
+install:
+	mkdir -p $(MDIR)
+	cp -f $(O_TARGET) $(MDIR)
 
 clean:
 	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) clean
