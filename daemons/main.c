@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.9 2004/01/16 17:51:54 whiles Exp whiles $
+ * $Id: main.c,v 1.10 2004/01/16 20:35:04 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -60,7 +60,7 @@ static char *defdevice=DEFDEVICE;		// device API interface
 static char *device=DEFDEVICE;			// device API interface
 static char *defpidfile=DEFPIDFILE;	// where to store PID number
 static char *pidfile=DEFPIDFILE;		// where to store PID number
-static int debug=0;				// debug=0:  debug off
+int debug=0;				// debug=0:  debug off
 static char *progname;				// name used to start program
 static char *logtag;				// tag to add to log lines
 static int syslog_facility=LOG_LOCAL5;
@@ -311,7 +311,6 @@ static void listen()
   sem_init(&xcvrio.connected,1,0);
   sem_init(&state.lock,1,1);
   xcvrio.device = serial;
-  xcvrio.debug = debug;
   xcvrio.logtag = logtag;
   xmitstack = malloc(CHILDSTACKSIZE);
   dsyslog(LOG_INFO,"starting transceiver\n");
