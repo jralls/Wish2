@@ -1,6 +1,6 @@
 /*
  *
- * $Id: x10d.c,v 1.4 2004/01/10 19:31:03 whiles Exp whiles $
+ * $Id: x10d_core.c,v 1.5 2004/01/11 20:00:51 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -68,12 +68,10 @@ static int api;					// file handle for the API interface
 static int timeout=10;				// timeout for waiting for response from API
 static int xmitpid=0;				// pid for transmitter thread
 static char *serial=NULL;			// serial device
-static void **xmitstack = NULL;			// stack space for transmit thread
+static void **xmitstack;			// stack space for transmit thread
 
 char localhostname[MAXHOSTNAMELEN+1];
 char *localdomain;
-
-#define dprintf if(debug) printf
 
 #define TESTNEXTARG if(i+2>argc){ syntax(argc,argv,0); exit(1); }
 
@@ -222,6 +220,7 @@ void start()
   }
 
   // signal handlers started...device connected, now run run run!!!
+  // from this point on we cannot use printf!!!
   listen();
 } 
 
@@ -258,11 +257,8 @@ static sighandler_type reapchild()
 {
   int status;
   syslog(LOG_INFO,"%s(%s): killing all children\n",progname,logtag);
-  dprintf("%s: reapchild()\n",progname);
   kill(xmitpid,SIGHUP);
-  while(waitpid(-1,&status,WNOHANG) > 0);
-  free(xmitstack);
-  xmitstack = NULL;
+  while(waitpid(xmitpid,&status,WNOHANG) > 0);
 }
 
 static sighandler_type die(int sig)
@@ -271,20 +267,13 @@ static sighandler_type die(int sig)
   char buf[100];
 
   if (sig) {
-    syslog(LOG_INFO, "exiting on signal %d\n",sig);
-    dprintf("%s(%s): exiting on signal %d\n",progname,logtag,sig);
+    syslog(LOG_INFO, "%s(%s): exiting on signal %d\n",progname,logtag,sig);
     errno = 0;
   }
   syslog(LOG_INFO, "%s(%s): killing all children\n",progname,logtag);
-  dprintf("%s(%s): killing all children\n",progname,logtag);
   if (xmitpid > 0)
     kill(xmitpid,SIGHUP);
-  if (xmitstack != NULL){
-    free(xmitstack);
-    xmitstack = NULL;
-  }
   syslog(LOG_INFO, "%s(%s): closing all files and exiting\n",progname,logtag);
-  dprintf("%s(%s): closing all files and exiting\n",progname,logtag);
   close(api);
   unlink(pidfile);
   closelog();
@@ -305,17 +294,25 @@ static void listen()
   int n;
   x10_message_t m;
 
-  sem_init(&start.lock,1,1);
+  sem_init(&xcvrio.connected,1,0);
+  sem_init(&state.lock,1,1);
   xcvrio.device = serial;
   xcvrio.debug = debug;
   xcvrio.logtag = logtag;
-  xmitstack = (void **)malloc(1024*16);
+  xmitstack = malloc(CHILDSTACKSIZE);
   xmitpid = clone((int (*)(void *))xmit_init,xmitstack,CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_PTRACE | CLONE_VM,(void *)&xcvrio);
   if (xmitpid < 0) {
     syslog(LOG_INFO, "%s(%s): unable to clone, exiting - %s\n",progname,logtag,strerror(errno));
     unlink(pidfile);
     closelog();
-    free(xmitstack);
+    exit(-1);
+  }
+  sem_wait(&xcvrio.connected);
+  if (xcvrio.status != 0) {
+    syslog(LOG_INFO,"%s(%s): unable to start transmitter, exiting\n",progname,logtag);
+    unlink(pidfile);
+    closelog();
+    while(waitpid(xmitpid,&n,WNOHANG) > 0);
     exit(-1);
   }
 
@@ -325,25 +322,23 @@ static void listen()
     n = read(api,&m,sizeof(m));
     if (n < 0) {
       syslog(LOG_INFO,"%s(%s): Error reading API interface - %s\n",progname,logtag,strerror(errno));
-      dprintf("%s:  Error reading API interface, continuing...\n");
       continue;
     }
     if (n != sizeof(m)) {
       syslog(LOG_INFO,"%s(%s): Error - incorrect API byte count, got %d, should have gotten %d\n",progname,logtag,n,sizeof(m));
-      dprintf("%s: Error - incorrect API byte count, got %d, should have gotten %d\n",progname,n,sizeof(m));
       continue;
     }
-    dprintf("X10 message: src=0x%x, hc=0x%x, uc=0x%x, cmd=0x%x, f=0x%x\n",m.source,m.housecode,m.unitcode,m.command,m.flag);
+    dsyslog(LOG_INFO,"X10 message: src=0x%x, hc=0x%x, uc=0x%x, cmd=0x%x, f=0x%x\n",m.source,m.housecode,m.unitcode,m.command,m.flag);
     switch (m.source) {
       case X10_API:
         break;
       case X10_DATA:
       case X10_CONTROL:
-        xmit_send(m.housecode,m.unitcode,m.command);
+        xcvrio.send(m.housecode,m.unitcode,m.command);
         update_state(1,m.housecode,m.unitcode,m.command,NULL,0);
         break;
       default:
-        dprintf("%s: Error - invalid API source %d\n",progname,m.source);
+        dsyslog(LOG_INFO,"%s: Error - invalid API source %d\n",progname,m.source);
         break;
     }
   } // while(1) loop
@@ -363,7 +358,6 @@ static int updatestatus(int hc, int uc, int value)
   }
   else{
     syslog(LOG_INFO,"%s(%s): Error - write did not complete\n",progname,logtag);
-    dprintf("%s: Error - write did not complete, incorrect byte count\n",progname);
     return -1;
   }
 }
@@ -382,7 +376,7 @@ static int update_state(int dir, int hc, int uc, int fc,unsigned char *buf, int 
 {
   int i,ret=0;
 
-  dprintf("dir=%d, hc=0x%x, uc=0x%x, fc=0x%x\n",dir,hc,uc,fc);
+  dsyslog(LOG_INFO,"dir=%d, hc=0x%x, uc=0x%x, fc=0x%x\n",dir,hc,uc,fc);
   hc &= 0x0f;
   uc &= 0x0f;
 
@@ -411,7 +405,6 @@ static int update_state(int dir, int hc, int uc, int fc,unsigned char *buf, int 
     state.uc[state.hc][uc] = 1;
     state.lastuc = uc;
   }
-  log_store(dir, hc, uc, fc);
   // something just changed so now update the queue head to wake everyone up
 
   if (fc >= 0) {
@@ -465,45 +458,43 @@ static int update_state(int dir, int hc, int uc, int fc,unsigned char *buf, int 
         }
       break;
     case X10_CMD_STATUS:
-      dbg("status request to housecode %c",'A'+state.hc);
+      dsyslog(LOG_INFO,"status request to housecode %c",'A'+state.hc);
       break;
     case X10_CMD_STATUSOFF:
-      dbg("status of %c%d is OFF",'A'+state.hc,state.lastuc+1);
+      dsyslog(LOG_INFO,"status of %c%d is OFF",'A'+state.hc,state.lastuc+1);
       if (state.hc < MAX_HOUSECODES && state.lastuc < MAX_UNITS) {
         updatestatus(state.hc,state.lastuc,0);
       }
       break;
     case X10_CMD_STATUSON:
-      dbg("status of %c%d is ON",'A'+state.hc,state.lastuc+1);
+      dsyslog(LOG_INFO,"status of %c%d is ON",'A'+state.hc,state.lastuc+1);
       if (state.hc < MAX_HOUSECODES && state.lastuc < MAX_UNITS) {
         updatestatus(state.hc,state.lastuc,100);
       }
       break;
     case X10_CMD_HAILREQUEST:
-      dbg("hail request to housecode %c",'A'+state.hc);
+      dsyslog(LOG_INFO,"hail request to housecode %c",'A'+state.hc);
       break;
     case X10_CMD_HAILACKNOWLEDGE:
-      dbg("hail ACK to housecode %c",'A'+state.hc);
+      dsyslog(LOG_INFO,"hail ACK to housecode %c",'A'+state.hc);
       break;
     case X10_CMD_EXTENDEDCODE:      // extended code
-      dbg("extended code to housecode %c",'A'+state.hc);
+      dsyslog(LOG_INFO,"extended code to housecode %c",'A'+state.hc);
       if (len > 0){
-        dbg("%s",dumphex(buf,len));
-        edata_store(state.hc,buf,len);
+        return -1;
       }
       break;
     case X10_CMD_EXTENDEDDATAA:     // extended data (analog)
-      dbg("extended data (analog) to housecode %c", 'A' + state.hc);
+      dsyslog(LOG_INFO,"extended data (analog) to housecode %c", 'A' + state.hc);
       if (len > 0){
-        dbg("%s",dumphex(buf,len));
-        edata_store(state.hc,buf,len);
+        return -1;
       }
       break;
     case X10_CMD_PRESETDIMHIGH:     // already handled
-      dbg("preset dim low %c%d",'A'+state.hc,state.lastuc);
+      dsyslog(LOG_INFO,"preset dim low %c%d",'A'+state.hc,state.lastuc);
       break;
     case X10_CMD_PRESETDIMLOW:      // already handled
-      dbg("preset dim low %c%d",'A'+state.hc,state.lastuc);
+      dsyslog(LOG_INFO,"preset dim low %c%d",'A'+state.hc,state.lastuc);
       break;
     default:
       ret = -1;
