@@ -1,6 +1,6 @@
 /*
  *
- * $Id: plusb_xcvr.c,v 1.7 2004/07/05 01:16:02 whiles Exp whiles $
+ * $Id: plusb_xcvr.c,v 1.8 2004/10/21 01:30:40 whiles Exp root $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -140,13 +140,15 @@ int hidwrite(int fd,unsigned char *c,int length)
     dsyslog(LOG_INFO,"Error writing to USB device (%s)\n",strerror(errno));
     return ret;
   }
-  else 
+  else {
     dsyslog(LOG_INFO,"wrote %s\n",dumphex(scratch,(void *)c,length));
+//    usleep(delay*250);
+  }
   
   return length;
 }
 
- struct hiddev_event ev[64];
+struct hiddev_event ev[64];
 int hidread(int fd,unsigned char *c, int length, int timeout)
 {
   fd_set fdset;
@@ -188,6 +190,7 @@ int hidread(int fd,unsigned char *c, int length, int timeout)
   ioctl(fd,HIDIOCGREPORT,&hidout.rep_info);
   while (ioctl(fd, HIDIOCGREPORTINFO, &hidin.rep_info) >= 0) {
     dsyslog(LOG_INFO,"INPUT Report id: %d (%d fields)\n",hidin.rep_info.report_id,hidin.rep_info.num_fields);
+    if (hold > 0) usleep(hold*250);
     for (alv = 0; alv < hidin.rep_info.num_fields; alv++) {
       memset(&hidin.field_info,0,sizeof(hidin.field_info));
       hidin.field_info.report_type = hidin.rep_info.report_type;
@@ -195,6 +198,7 @@ int hidread(int fd,unsigned char *c, int length, int timeout)
       hidin.field_info.field_index = alv;
       ioctl(fd, HIDIOCGFIELDINFO, &hidin.field_info);
       dsyslog(LOG_INFO,"INPUT Field: %d: app: %04x phys %04x flags %x (%d usages) unit %x exp %d\n", alv, hidin.field_info.application, hidin.field_info.physical, hidin.field_info.flags, hidin.field_info.maxusage, hidin.field_info.unit, hidin.field_info.unit_exponent);
+      if (hold > 0) usleep(hold*250);
       memset(&hidin.usage_ref, 0, sizeof(hidin.usage_ref));
       for (yalv = 0; yalv < hidin.field_info.maxusage; yalv++) {
         hidin.usage_ref.report_type = hidin.field_info.report_type;
@@ -204,6 +208,7 @@ int hidread(int fd,unsigned char *c, int length, int timeout)
         ioctl(fd, HIDIOCGUCODE, &hidin.usage_ref);
         ioctl(fd, HIDIOCGUSAGE, &hidin.usage_ref);
         dsyslog(LOG_INFO,"INPUT Usage: %04x val %02x idx %x\n", hidin.usage_ref.usage_code,hidin.usage_ref.value, hidin.usage_ref.usage_index);
+        if (hold > 0) usleep(hold*250);
         c[hidin.usage_ref.usage_index] = hidin.usage_ref.value;
       }
     }
@@ -215,33 +220,37 @@ int hidread(int fd,unsigned char *c, int length, int timeout)
 __s32 statusrequest() {
   unsigned char start[8];
   int ret = 0;
+  int i;
 
   memset(start,0,sizeof(start));
   start[0] = X10_PLUSB_XMITCTRL;
   start[1] = X10_PLUSB_TCTRLSTATUS;       // request status response
+  i = 0;
   do {
     ret = hidwrite(serial,start,sizeof(start));
     if (ret == EBUSY)
       usleep(delay*1000);
-    if (ret < 0) {
-      syslog(LOG_INFO,"USB Powerlinc initialization failed on status request (%s)\n",strerror(errno));
-      return ret;
-    }
-  } while (ret < 0);
+  } while (ret < 0 && (i++ < retries));
+  if (ret < 0) {
+    syslog(LOG_INFO,"USB Powerlinc initialization failed on status request (%s)\n",strerror(errno));
+    return ret;
+  }
+
+  i = 0;
   do {
     ret = hidread(serial,start,sizeof(start),timeout);
     if (ret == EBUSY)
       usleep(delay*1000);
-    else if (ret < 0) {
-      syslog(LOG_INFO,"USB Powerlinc initialization failed to return status (%s)\n",strerror(errno));
-      return ret;
-    }
-  } while (ret < 0);
+  } while (ret < 0 && (i++ < retries));
+  if (ret < 0) {
+    syslog(LOG_INFO,"USB Powerlinc initialization failed to return status (%s)\n",strerror(errno));
+    return ret;
+  }
   if (ret == 0){
     syslog(LOG_INFO,"Timeout waiting for response from PowerLinc\n");
     return -1;
   }
-  return((start[0]&0x7f)<<24 | start[1]<<16 | start[3]<<8 | start[4]);
+  return((start[0]<<24 | start[1]<<16 | start[3]<<8 | start[4])&0x7fffffff);
 }
 
 int hidinit(int fd)
@@ -264,7 +273,7 @@ int hidinit(int fd)
           (usbinfo.num_applications==1?"":"s"),usbinfo.busnum,
           usbinfo.devnum,usbinfo.ifnum);
   if (usbinfo.vendor == 0x10bf) {
-    syslog(LOG_INFO,"USB Powerinc version 0x%04hx found\n",usbinfo.version);
+    syslog(LOG_INFO,"USB Powerlinc version 0x%04hx found\n",usbinfo.version);
   }
   else {
     syslog(LOG_INFO,"%s is not a USB PowerLinc\n",io->device);
@@ -280,6 +289,7 @@ int hidinit(int fd)
   hidin.rep_info.report_id = HID_REPORT_ID_FIRST;
   while (ioctl(fd, HIDIOCGREPORTINFO, &hidin.rep_info) >= 0) {
     dsyslog(LOG_INFO,"INPUT Report id: %d (%d fields)\n",hidin.rep_info.report_id,hidin.rep_info.num_fields);
+    if (hold > 0) usleep(hold*250);
     for (alv = 0; alv < hidin.rep_info.num_fields; alv++) {
       memset(&hidin.field_info,0,sizeof(hidin.field_info));
       hidin.field_info.report_type = hidin.rep_info.report_type;
@@ -287,6 +297,7 @@ int hidinit(int fd)
       hidin.field_info.field_index = alv;
       ioctl(fd, HIDIOCGFIELDINFO, &hidin.field_info);
       dsyslog(LOG_INFO,"INPUT Field: %d: app: %04x phys %04x flags %x (%d usages) unit %x exp %d\n", alv, hidin.field_info.application, hidin.field_info.physical, hidin.field_info.flags, hidin.field_info.maxusage, hidin.field_info.unit, hidin.field_info.unit_exponent);
+      if (hold > 0) usleep(hold*250);
       memset(&hidin.usage_ref, 0, sizeof(hidin.usage_ref));
       for (yalv = 0; yalv < hidin.field_info.maxusage; yalv++) {
         hidin.usage_ref.report_type = hidin.field_info.report_type;
@@ -296,6 +307,7 @@ int hidinit(int fd)
         ioctl(fd, HIDIOCGUCODE, &hidin.usage_ref);
         ioctl(fd, HIDIOCGUSAGE, &hidin.usage_ref);
         dsyslog(LOG_INFO,"INPUT Usage: %04x val %02x idx %x\n", hidin.usage_ref.usage_code,hidin.usage_ref.value, hidin.usage_ref.usage_index);
+        if (hold > 0) usleep(hold*250);
       }
     }
     hidin.rep_info.report_id |= HID_REPORT_ID_NEXT;
@@ -304,6 +316,7 @@ int hidinit(int fd)
   hidout.rep_info.report_id = HID_REPORT_ID_FIRST;
   while (ioctl(fd, HIDIOCGREPORTINFO, &hidout.rep_info) >= 0) {
     dsyslog(LOG_INFO,"OUTPUT Report id: %d (%d fields)\n",hidout.rep_info.report_id,hidout.rep_info.num_fields);
+    if (hold > 0) usleep(hold*250);
     for (alv = 0; alv < hidout.rep_info.num_fields; alv++) {
       memset(&hidout.field_info,0,sizeof(hidout.field_info));
       hidout.field_info.report_type = hidout.rep_info.report_type;
@@ -311,6 +324,7 @@ int hidinit(int fd)
       hidout.field_info.field_index = alv;
       ioctl(fd, HIDIOCGFIELDINFO, &hidout.field_info);
       dsyslog(LOG_INFO,"OUTPUT Field: %d: app: %04x phys %04x flags %x (%d usages) unit %x exp %d\n", alv, hidout.field_info.application, hidout.field_info.physical, hidout.field_info.flags, hidout.field_info.maxusage, hidout.field_info.unit, hidout.field_info.unit_exponent);
+      if (hold > 0) usleep(hold*250);
       memset(&hidout.usage_ref, 0, sizeof(hidout.usage_ref));
       for (yalv = 0; yalv < hidout.field_info.maxusage; yalv++) {
         hidout.usage_ref.report_type = hidout.field_info.report_type;
@@ -318,8 +332,9 @@ int hidinit(int fd)
         hidout.usage_ref.field_index = alv;
         hidout.usage_ref.usage_index = yalv;
         ioctl(fd, HIDIOCGUCODE, &hidout.usage_ref);
-        ioctl(fd, HIDIOCGUSAGE, &hidout.usage_ref);
+//        ioctl(fd, HIDIOCGUSAGE, &hidout.usage_ref);
         dsyslog(LOG_INFO,"OUTPUT Usage: %04x val %02x idx %x\n", hidout.usage_ref.usage_code,hidout.usage_ref.value, hidout.usage_ref.usage_index);
+        if (hold > 0) usleep(hold*250);
       }
     }
     hidout.rep_info.report_id |= HID_REPORT_ID_NEXT;
@@ -341,6 +356,7 @@ int hidinit(int fd)
       goto error;
     }
   } while (ret < 0);
+  if (hold > 0) usleep(hold*250);
   start[0] = X10_PLUSB_XMITCTRL;
   start[1] = X10_PLUSB_TCTRLRSTCONT       // make sure continuous is off
            | X10_PLUSB_TCTRLRSTFLAG       // turn off flagging services
@@ -356,6 +372,7 @@ int hidinit(int fd)
       goto error;
     }
   } while (ret < 0);
+  if (hold > 0) usleep(hold*250);
   dsyslog(LOG_INFO,"USB PowerLinc stages 1 and 2 complete\n");
   status = statusrequest();
   if (status < 0)
