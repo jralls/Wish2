@@ -36,6 +36,7 @@ modules_install:
 	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules_install
 
 clean:
-	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) clean
+	rm -f .*.o.flags
+	rm -f *.o
 
 include $(KDIR)/Rules.make
