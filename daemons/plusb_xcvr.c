@@ -1,6 +1,6 @@
 /*
  *
- * $Id: plusb_xcvr.c,v 1.2 2004/01/19 04:47:05 whiles Exp whiles $
+ * $Id: plusb_xcvr.c,v 1.3 2004/02/18 04:46:22 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -86,8 +86,6 @@ int hidwrite(int fd,unsigned char *c,int length)
   int ret;
   int i,alv,yalv;
   char scratch[80];
-
-  return length;
 /*
   hidout.rep_info.report_type = HID_REPORT_TYPE_OUTPUT;
   hidout.rep_info.report_id = HID_REPORT_ID_FIRST;
@@ -120,7 +118,11 @@ int hidwrite(int fd,unsigned char *c,int length)
     hidout.usage_ref.field_index = 0;
     hidout.usage_ref.usage_index = i;
     hidout.usage_ref.value = c[i];
-    ioctl(fd,HIDIOCSUSAGE,&hidout.usage_ref);
+    ret = ioctl(fd,HIDIOCSUSAGE,&hidout.usage_ref);
+    if (ret < 0){
+      dsyslog(LOG_INFO,"Error loading usage (%s)\n",strerror(errno));
+      return ret;
+    }
   }
   
   hidout.rep_info.report_type = HID_REPORT_TYPE_OUTPUT;
@@ -133,8 +135,6 @@ int hidwrite(int fd,unsigned char *c,int length)
   }
   else 
     dsyslog(LOG_INFO,"wrote %s\n",dumphex(scratch,(void *)c,length));
-
-  sleep(2);
   
   return length;
 }
@@ -205,6 +205,38 @@ int hidread(int fd,unsigned char *c, int length, int timeout)
   return hidin.field_info.maxusage;
 }  
 
+__s32 statusrequest() {
+  unsigned char start[8];
+  int ret;
+
+  memset(start,0,sizeof(start));
+  start[0] = X10_PLUSB_XMITCTRL;
+  start[1] = X10_PLUSB_TCTRLSTATUS;       // request status response
+  do {
+    ret = hidwrite(serial,start,sizeof(start));
+    if (ret == EBUSY)
+      usleep(delay*1000);
+    if (ret < 0) {
+      syslog(LOG_INFO,"USB Powerlinc initialization failed on status request (%s)\n",strerror(errno));
+      return ret;
+    }
+  } while (ret < 0);
+  do {
+    ret = hidread(serial,start,sizeof(start),timeout);
+    if (ret == EBUSY)
+      usleep(delay*1000);
+    else if (ret < 0) {
+      syslog(LOG_INFO,"USB Powerlinc initialization failed to return status (%s)\n",strerror(errno));
+      return ret;
+    }
+  } while (ret < 0);
+  if (ret == 0){
+    syslog(LOG_INFO,"Timeout waiting for response from PowerLinc\n");
+    return -1;
+  }
+  return ((start[0]&0x7f)<<24) | start[1]<<16 | start[2]<<8 | start[3];
+}
+
 int hidinit(int fd)
 {
   struct hiddev_devinfo usbinfo;
@@ -213,6 +245,7 @@ int hidinit(int fd)
   int report_type;
   int appl,alv,yalv;
   unsigned int intf;
+  __s32 status;
   ssize_t ret;
 
   dsyslog(LOG_INFO,"Connecting to USB Powerlinc Interface on %s\n",io->device);
@@ -255,7 +288,7 @@ int hidinit(int fd)
         hidin.usage_ref.usage_index = yalv;
         ioctl(fd, HIDIOCGUCODE, &hidin.usage_ref);
         ioctl(fd, HIDIOCGUSAGE, &hidin.usage_ref);
-        dsyslog(LOG_INFO,"INPUT Usage: %04x val %d idx %x\n", hidin.usage_ref.usage_code,hidin.usage_ref.value, hidin.usage_ref.usage_index);
+        dsyslog(LOG_INFO,"INPUT Usage: %04x val %02x idx %x\n", hidin.usage_ref.usage_code,hidin.usage_ref.value, hidin.usage_ref.usage_index);
       }
     }
     hidin.rep_info.report_id |= HID_REPORT_ID_NEXT;
@@ -279,7 +312,7 @@ int hidinit(int fd)
         hidout.usage_ref.usage_index = yalv;
         ioctl(fd, HIDIOCGUCODE, &hidout.usage_ref);
         ioctl(fd, HIDIOCGUSAGE, &hidout.usage_ref);
-        dsyslog(LOG_INFO,"OUTPUT Usage: %04x val %d idx %x\n", hidout.usage_ref.usage_code,hidout.usage_ref.value, hidout.usage_ref.usage_index);
+        dsyslog(LOG_INFO,"OUTPUT Usage: %04x val %02x idx %x\n", hidout.usage_ref.usage_code,hidout.usage_ref.value, hidout.usage_ref.usage_index);
       }
     }
     hidout.rep_info.report_id |= HID_REPORT_ID_NEXT;
@@ -292,40 +325,36 @@ int hidinit(int fd)
   start[0] = X10_PLUSB_XMITCTRL;
   start[1] = X10_PLUSB_TCTRLQUALITY;
   start[2] = 0x1e;                        // detect threshold
-  ret = hidwrite(serial,start,sizeof(start));
-  if (ret < 0) {
-    syslog(LOG_INFO,"USB Powerlinc initialization failed on setup1 (%s)\n",strerror(errno));
-    goto error;
-  }
+  do {
+    ret = hidwrite(serial,start,sizeof(start));
+    if (ret == EBUSY)
+      usleep(delay*1000);
+    else if (ret < 0) {
+      syslog(LOG_INFO,"USB Powerlinc initialization failed on setup1 (%s)\n",strerror(errno));
+      goto error;
+    }
+  } while (ret < 0);
   start[0] = X10_PLUSB_XMITCTRL;
   start[1] = X10_PLUSB_TCTRLRSTCONT       // make sure continuous is off
            | X10_PLUSB_TCTRLRSTFLAG       // turn off flagging services
            | X10_PLUSB_TCTRLRSTRPT        // turn off reporting mode
            | X10_PLUSB_TCTRLWAIT;         // transmit after quiet period
   start[2] = 0;
-  ret = hidwrite(serial,start,sizeof(start));
-  if (ret < 0) {
-    syslog(LOG_INFO,"USB Powerlinc initialization failed on setup2 (%s)\n",strerror(errno));
-    goto error;
-  }
+  do {
+    ret = hidwrite(serial,start,sizeof(start));
+    if (ret == EBUSY)
+      usleep(delay*1000);
+    else if (ret < 0) {
+      syslog(LOG_INFO,"USB Powerlinc initialization failed on setup2 (%s)\n",strerror(errno));
+      goto error;
+    }
+  } while (ret < 0);
   dsyslog(LOG_INFO,"USB PowerLinc stages 1 and 2 complete\n");
-  sleep(2);
-  dsyslog(LOG_INFO,"thanks for the nap...\n");
-  start[0] = X10_PLUSB_XMITCTRL;
-  start[1] = X10_PLUSB_TCTRLSTATUS;       // request status response
-  start[2] = 0;
-  ret = hidwrite(serial,start,sizeof(start));
-  if (ret < 0) {
-    syslog(LOG_INFO,"USB Powerlinc initialization failed on status request (%s)\n",strerror(errno));
+  status = statusrequest();
+  if (status < 0)
     goto error;
-  }
-/*  ret = hidread(serial,start,sizeof(start),timeout);
-  if (ret <= 0) {
-    syslog(LOG_INFO,"USB Powerlinc initialization failed to return status (%s)\n",strerror(errno));
-    goto error;
-  }
-  syslog(LOG_INFO,"USB Powerlinc Hardware Rev %d.%d found\n",start[3],start[4]);
-*/
+  syslog(LOG_INFO,"USB Powerlinc Hardware Rev %d.%d found\n",(status>>8)&0xff,status&0xff);
+
 done:
   io->status = 0;
   sem_post(&io->connected);
@@ -477,6 +506,7 @@ int transmit(int hc, int uc, int cmd)
   int ret, i;
   struct pl_cmd data;
   char scratch[40];
+  __s32 status;
 
   dsyslog(LOG_INFO,"transmit:  hc=0x%x, uc=0x%x, fc=0x%x\n",hc,uc,cmd);
   if (cmd >= X10_CMD_END){
@@ -496,23 +526,41 @@ int transmit(int hc, int uc, int cmd)
   if (uc >= 0){            // negative value for u causes us to skip u
     data.d.byte[i] = unitcode[uc] | 0x40;
     dsyslog(LOG_INFO,"sending %s", dumphex(scratch,(void *) &data, sizeof(data)));
-    ret = hidwrite(serial, (unsigned char *)&data, sizeof(data));
-    if (!waitforack(timeout)){
-      syslog(LOG_INFO,"timeoutwaiting for ACK from USB PowerLinc\n");
-      ret = -1;
-      goto done;
-    }
+/*    do {
+      status = statusrequest();
+      if (status < 0)
+        goto done;
+    } while (status & 0x06000000); */
+    usleep(delay*1000);
+    do {
+      ret = hidwrite(serial, (unsigned char *)&data, sizeof(data));
+      if (ret == EBUSY)
+        usleep(delay*1000);
+      else if (ret < 0) {
+        dsyslog(LOG_INFO,"Error writing to device (%s)\n",strerror(errno));
+        goto done;
+      }
+    } while (ret < 0);
+/*    do {
+      status = statusrequest();
+      if (status < 0)
+        goto done;
+    } while (status & 0x06000000); */
   }
   // Reuse current transmit data since cmd goes in same place as unit
   if (cmd >= 0){          // negative value for cmd causes us to skip cmd
     data.d.byte[i] = functioncode[cmd] | 0x60;
     dsyslog(LOG_INFO,"sending %s", dumphex(scratch,(void *) &data, sizeof(data)));
-    ret = hidwrite(serial, (unsigned char *)&data, sizeof(data));
-    if (!waitforack(timeout)){
-      syslog(LOG_INFO,"timeoutwaiting for ACK from USB PowerLinc\n");
-      ret = -1;
-      goto done;
-    }
+    usleep(delay*1000);
+    do {
+      ret = hidwrite(serial, (unsigned char *)&data, sizeof(data));
+      if (ret == EBUSY)
+        usleep(delay*1000);
+      else if (ret < 0) {
+        dsyslog(LOG_INFO,"Error writing to device (%s)\n",strerror(errno));
+        goto done;
+      }
+    } while (ret < 0);
   }
 
 done:
