@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.8 2004/01/05 00:42:04 whiles Exp whiles $
+ * $Id: dev.c,v 1.9 2004/01/06 03:46:14 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -56,9 +56,9 @@
 #include <linux/version.h>
 
 #define __X10_MODULE__
-#include "x10.h"
-#include "dev.h"
+#include "../include/x10.h"
 #include "strings.h"
+#include "dev.h"
 
 #define DATA_DEVICE_NAME "x10d"
 #define CONTROL_DEVICE_NAME "x10c"
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.8 2004/01/05 00:42:04 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.9 2004/01/06 03:46:14 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
@@ -400,6 +400,8 @@ static void log_init(void)
 {
   spin_lock_init(&log.spinlock);
   init_waitqueue_head(&log.changed);
+  atomic_set(&log.begin,0);
+  atomic_set(&log.end,0);
 }
 
 static void log_store(int dir,int hc, int uc, int fc)
@@ -407,13 +409,13 @@ static void log_store(int dir,int hc, int uc, int fc)
   int begin,end;
 
   spin_lock(&log.spinlock);
-  dbg("dir=%d, hc=%d, uc=%d, fc=%d\n",dir,hc,uc,fc);
+  dbg("dir=%d, hc=%d, uc=%d, fc=%d",dir,hc,uc,fc);
   if (uc >= 0 && fc >= 0){
     log("%c %c%d",(dir?'T':'R'),hc+'A',uc+1);
     log("%c %c %s",(dir?'T':'R'),hc+'A',logstring[fc]);
   }
   else if (uc >= 0)
-    log("%c %c%d",(dir?'T':'R'), hc+'A', uc + 1);
+    log("%c %c%d",(dir?'T':'R'), hc+'A', uc+1);
   else if (fc >= 0)
     log("%c %c %s",(dir?'T':'R'), hc+'A', logstring[fc]);
 
@@ -441,7 +443,7 @@ static int log_get(loff_t *offset,unsigned char *ubuffer,int len)
 {
   int hc,uc,fc,dir;
   struct timeval *tv;
-  char tbuffer[64];
+  char tbuffer[80];
   int ret;
 
   spin_lock(&log.spinlock);
@@ -454,8 +456,7 @@ static int log_get(loff_t *offset,unsigned char *ubuffer,int len)
   tv = &log.data[*offset].tv;
   spin_unlock(&log.spinlock);
   if (uc >= 0 && fc >= 0){
-    sprintf(tbuffer,"%ld %c %c%d\n",(long)tv->tv_sec,(dir?'T':'R'),hc+'A',uc+1);
-    sprintf(tbuffer,"%ld %c %c %s\n",(long)tv->tv_sec,(dir?'T':'R'), hc+'A',logstring[fc]);
+    sprintf(tbuffer,"%ld %c %c%d\n%ld %c %c %s\n",(long)tv->tv_sec,(dir?'T':'R'),hc+'A',uc+1,(long)tv->tv_sec,(dir?'T':'R'), hc+'A',logstring[fc]);
   }
   else if (uc >= 0)
     sprintf(tbuffer,"%ld %c %c%d\n",(long)tv->tv_sec,(dir?'T':'R'),hc+'A',uc+1);
@@ -834,14 +835,17 @@ ssize_t api_write(x10_message_t *message,x10mqueue_t *q)
 	break;
     case X10_DATA:
 	dbg("%s","X10_API data");
-	value = (int)message->command;
+	value = (int)message->flag;
 	if (value > 100 || value < 0)
 	  return -EFAULT;
 	updatestatus(message->housecode,message->unitcode,value,1);
-        log_store((int)message->flag,message->housecode,message->unitcode,message->command);
 	return sizeof(x10_message_t);
 	break;
     case X10_CONTROL:
+	dbg("%s","X10_API control");
+        log_store((int)message->flag,message->housecode,message->unitcode,message->command);
+	return sizeof(x10_message_t);
+	break;
     default:
       dbg("Invalid message type %x",message->source);
       break;
@@ -895,6 +899,7 @@ static ssize_t data_read(struct file *file,char *buffer,size_t length, loff_t * 
   if (length < sizeof(tbuffer))
     return -EINVAL;
   dbg("major:minor %d:%d (%c%02d)",major,minor,'a'+(char)(hc),uc+1);
+  atomic_set(&data->value,getstatus(hc,uc,0));
   sprintf(tbuffer,"%03d\n",atomic_read(&data->value));
   ret = strlen(tbuffer);
   if (copy_to_user(buffer,&tbuffer,ret+1))
