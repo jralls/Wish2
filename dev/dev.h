@@ -3,7 +3,7 @@
 
 /*
  *
- * $Id: x10_dev.h,v 1.2 2004/01/01 17:24:15 whiles Exp whiles $
+ * $Id: x10_dev.h,v 1.3 2004/01/01 21:02:51 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -101,6 +101,13 @@
 
 #define HOUSECODE(a) (((a)&0xf0)>>4)
 #define UNITCODE(a) ((a)&0x0f)
+
+typedef struct x10mqueue {
+  atomic_t	head;
+  atomic_t	tail;
+  spinlock_t    spinlock;
+  x10_message_t	queue[MESSAGE_QUEUE_SIZE];
+} x10mqueue_t;
 
 #endif				// #ifdef __X10_MODULE__
 

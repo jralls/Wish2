@@ -1,6 +1,8 @@
 #ifndef __X10_H__
 #define __X10_H__
 
+#include <linux/types.h>
+
 #define MESSAGE_QUEUE_SIZE	16
 
 typedef struct x10message {
@@ -10,13 +12,6 @@ typedef struct x10message {
   __u8		command;	// see X10_CMD_* below
   __u32		flag;		// flags (see below)
 } x10_message_t;
-
-typedef struct x10mqueue {
-  atomic_t	head;
-  atomic_t	tail;
-  spinlock_t    spinlock;
-  x10_message_t	queue[MESSAGE_QUEUE_SIZE];
-} x10mqueue_t;
 
 // Values for the type field
 #define X10_CMD			0x01
