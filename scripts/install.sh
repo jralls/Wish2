@@ -18,10 +18,10 @@ then
 	mkdir $moduledir
 fi
 
-echo "cp -f x10attach /usr/sbin/"
-cp -f x10attach /usr/sbin/
-echo "cp -f nbread /usr/sbin/"
-cp -f nbread /usr/sbin/
+echo "cp -f x10attach /usr/bin/"
+cp -f x10attach /usr/bin/
+echo "cp -f nbread /usr/bin/"
+cp -f nbread /usr/bin/
 echo "cp -f *.o $moduledir"
 cp -f *.o $moduledir
 echo "depmod -a $ver"
