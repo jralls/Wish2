@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: x10logd.c,v 1.5 2003/02/10 19:40:09 whiles Exp whiles $
+ * $Id: x10logd.c,v 1.1 2004/01/10 16:33:42 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -163,7 +163,8 @@ void start()
 	}	
 
 	if (f_logfile) {
-		x10log = open(logfile,O_APPEND|O_CREAT|O_SYNC|O_RDWR);
+		x10log = open(logfile,O_APPEND|O_CREAT|O_SYNC|O_RDWR,
+				      S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
 		if (x10log < 0) {
 			mysyslog(LOG_ERR,"Error:  Unable to open log %s (%s)\n",
 				logfile,strerror(errno));
