@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.8 2004/02/21 02:22:39 whiles Exp whiles $
+ * $Id: pl_xcvr.c,v 1.9 2004/02/29 03:01:38 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -69,7 +69,7 @@ int readchar(int fd, unsigned char *c, int timeout)
   fd_set set;
 
   tv.tv_sec = 0;
-  tv.tv_usec = timeout * 1000;
+  tv.tv_usec = timeout * 2000;
   FD_ZERO(&set);
   FD_SET(fd, &set);
   if (!select(fd + 1, &set, NULL, NULL, &tv)) 
