@@ -20,7 +20,7 @@ typedef struct xcvrio {
 extern int xmit_init(struct xcvrio *io);
 extern char *dumphex(char *hexbuffer,void *data, int len);
 
-extern int retries, delay, timeout, debug, fakereceive;
+extern int retries, delay, timeout, debug, fakereceive, hold;
 
 #define dprintf if (debug) printf
 
