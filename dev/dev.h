@@ -3,7 +3,7 @@
 
 /*
  *
- * $Id: x10_dev.h,v 1.3 2004/01/01 21:02:51 whiles Exp whiles $
+ * $Id: x10_dev.h,v 1.4 2004/01/01 21:34:09 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -106,8 +106,18 @@ typedef struct x10mqueue {
   atomic_t	head;
   atomic_t	tail;
   spinlock_t    spinlock;
+  wait_queue_head_t wq;
   x10_message_t	queue[MESSAGE_QUEUE_SIZE];
 } x10mqueue_t;
+
+typedef struct x10dataio {
+  atomic_t	changed;
+  atomic_t	value;
+} x10dataio_t;
+
+typedef struct x10controlio {
+  atomic_t	changed;
+} x10controlio_t;
 
 #endif				// #ifdef __X10_MODULE__
 
