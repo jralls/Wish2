@@ -1,6 +1,6 @@
 /*
  *
- * $Id: nbread.c,v 1.2 2002/12/17 15:40:07 whiles Exp $
+ * $Id: x10d.c,v 1.1 2004/01/01 21:35:05 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 		printf("Error:  Unable to open %s for reading\n",argv[1]);
 		return 1;
 	}
-        m.type = X10_API;
+        m.source = X10_API;
 	m.housecode = m.unitcode = 0;
 	m.command = X10_CMD_STATUS;
 	m.flag = 0;
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 		}
 		if (n == 0)   // end of file
 			return 0;
-		if (m.type == X10_API && m.command == X10_CMD_ON){
+		if (m.source == X10_API && m.command == X10_CMD_ON){
 			printf("Successfully opened X10 API");
 			return 0;
 		}
