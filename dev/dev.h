@@ -3,7 +3,7 @@
 
 /*
  *
- * $Id: x10_dev.h,v 1.1 2003/11/03 00:25:10 whiles Exp whiles $
+ * $Id: x10_dev.h,v 1.2 2004/01/01 17:24:15 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -82,14 +82,22 @@
 #define X10_CONTROL_WITHHDRS            0x1
 #define X10_CONTROL_READCHANGED         0x2
 
-#define X10_CONTROL_HCWHDRS             0       /* 0 */
-#define X10_CONTROL_HCWOHDRS            1       /* 16 */
-#define X10_CONTROL_STATUS              2       /* 32 */
-#define X10_CONTROL_DUMPLOG             3       /* 48 */
-#define X10_CONTROL_API			4	/* 64 */
-
-#define X10_CONTROL			0x100
-#define X10_DATA			0x000
+#define X10_CONTROL_HCWHDRS             0x0       /* 0 */
+#define X10_CONTROL_HCWOHDRS            0x1       /* 16 */
+#define X10_CONTROL_STATUS              0x2       /* 32 */
+#define X10_CONTROL_DUMPLOG             0x3       /* 48 */
+#define X10_CONTROL_4			0x4	/* 64 */
+#define X10_CONTROL_5			0x5	/* 80 */
+#define X10_CONTROL_6			0x6	/* 96 */
+#define X10_CONTROL_7			0x7	/* 112 */
+#define X10_CONTROL_8			0x8	/* 128 */
+#define X10_CONTROL_9			0x9	/* 144 */
+#define X10_CONTROL_10			0xa	/* 160 */
+#define X10_CONTROL_11			0xb	/* 176 */
+#define X10_CONTROL_12			0xc	/* 192 */
+#define X10_CONTROL_13			0xd	/* 208 */
+#define X10_CONTROL_14			0xe	/* 224 */
+#define X10_CONTROL_API			0xf	/* 240 */
 
 #define HOUSECODE(a) (((a)&0xf0)>>4)
 #define UNITCODE(a) ((a)&0x0f)
