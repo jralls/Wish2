@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.6 2004/01/16 23:17:31 whiles Exp whiles $
+ * $Id: cm11a_xcvr.c,v 1.1 2004/01/17 20:50:04 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -170,7 +170,7 @@ time_t cm11a_decodebattery(char *buf)
   addmon = buf[8] | (buf[9] << 8);                        // addr mon'd
   statmon = buf[10] | (buf[11] << 8);                     // stat of mon'd
   statdim = buf[12] | (buf[13] << 8);                     // stat of dim'd
-  printf("cm11a version %d found\n", rev);
+  syslog(LOG_INFO,"cm11a version %d found\n", rev);
   return t;
 }
 

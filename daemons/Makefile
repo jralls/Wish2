@@ -1,6 +1,6 @@
 #
 #
-# $Id: Makefile,v 1.1 2004/01/14 03:17:49 whiles Exp whiles $
+# $Id: Makefile,v 1.2 2004/01/17 20:50:34 whiles Exp whiles $
 #
 INC=-I/usr/src/linux/include -I../include
 CC=gcc
@@ -8,7 +8,7 @@ LD=gcc
 CFLAGS=-D_REENTRANT -static
 LDFLAGS=pthread
 
-all: .depend pld cm11ad
+all: .depend pld cm11ad plusbd
 
 cm11ad: main.o cm11a_xcvr.o
 	$(LD) -lpthread -o $@ $+
