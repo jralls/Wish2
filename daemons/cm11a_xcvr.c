@@ -1,6 +1,6 @@
 /*
  *
- * $Id: cm11a_xcvr.c,v 1.1 2004/01/17 20:50:04 whiles Exp whiles $
+ * $Id: cm11a_xcvr.c,v 1.2 2004/02/19 04:48:54 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -55,7 +55,7 @@
 
 #include <asm/types.h>
 
-#include "../include/x10.h"
+#include "x10.h"
 #include "x10d.h"
 #include "cm11a_xcvr.h"
 
