@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: x10_dev.c,v 1.2 2003/11/03 00:37:13 whiles Exp whiles $
+ * $Id: x10_dev.c,v 1.3 2004/01/01 17:23:16 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -79,7 +79,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: x10_dev.c,v 1.2 2003/11/03 00:37:13 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: x10_dev.c,v 1.3 2004/01/01 17:23:16 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
@@ -95,23 +95,26 @@ static __inline__ int XMINOR (struct file *a)
 /* prototypes for character device registration */
 static int __init x10_init (void);
 static void __exit x10_exit (void);
-static int x10_data_open (struct inode *inode, struct file *file);
-static int x10_data_release (struct inode *inode, struct file *file);
-static unsigned int x10_data_poll (struct file *, poll_table *);
-static ssize_t x10_data_read (struct file *file, char *buffer,
+static int x10_open (struct inode *inode, struct file *file);
+static int x10_release (struct inode *inode, struct file *file);
+static unsigned int x10_poll (struct file *, poll_table *);
+static ssize_t x10_read (struct file *file, char *buffer,
 			      size_t length, loff_t * offset);
-static ssize_t x10_data_write (struct file *file, const char *buffer,
+static ssize_t x10_write (struct file *file, const char *buffer,
 			       size_t length, loff_t * offset);
-static loff_t x10_data_llseek (struct file *file, loff_t offset, int origin);
+static loff_t x10_llseek (struct file *file, loff_t offset, int origin);
+static int x10mqueue_get(x10mqueue_t *q,x10_message_t *m);
+static int x10mqueue_add(x10mqueue_t *q,__u8 type,__u8 hc, __u8 uc, __u8 cmd, __u32 f);
+static ssize_t x10_api_write(x10_message_t *message,x10mqueue_t *q);
 
 struct file_operations device_fops = {
 	owner:		THIS_MODULE,
-	read:		x10_data_read,
-	write:		x10_data_write,
-	open:		x10_data_open,
-	poll:		x10_data_poll,
-	release:	x10_data_release,
-	llseek:		x10_data_llseek
+	read:		x10_read,
+	write:		x10_write,
+	open:		x10_open,
+	poll:		x10_poll,
+	release:	x10_release,
+	llseek:		x10_llseek
 };
 
 struct x10api {
@@ -120,6 +123,8 @@ struct x10api {
         int control_major;      // the target control device major
         int data;               // the actual data device major
         int control;            // the actual control device major
+
+	int us_connected;	// UserSpace driver connected flag
 
         void *private;
 };
@@ -156,13 +161,13 @@ dumphex (void *data, int len)
 int __init
 x10_init (void)
 {
-  int i;
   int res;
 
   x10api.data = -1;
   x10api.control = -1;
   x10api.data_major = data_major;
   x10api.control_major = control_major;
+  x10api.us_connected = 0;
 
   info (DISTRIBUTION_VERSION);
   info ("%s", version);
@@ -201,9 +206,6 @@ x10_init (void)
 void __exit
 x10_exit (void)
 {
-// only used if DEVFS is available
-  int i, j;
-
   dbg ("%s", "Unloading X10 driver");
 
   if (x10api.data >= 0) {
@@ -224,7 +226,39 @@ module_exit (x10_exit);
 
 /* FOPS functions */
 
-static int x10_data_open (struct inode *inode, struct file *file)
+static int x10_open (struct inode *inode, struct file *file)
+{
+  int minor=XMINOR(file);
+  int major=XMAJOR(file);
+  int hc = HOUSECODE(minor);
+  int uc = UNITCODE(minor);
+  x10mqueue_t *mqueue;
+
+  ANNOUNCE;
+  dbg ("major=%d, minor=%d", major, minor);
+  if (major == x10api.control_major)
+    dbg ("(CTRL) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
+  else
+    dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
+
+  if (major == x10api.control_major && hc == X10_CONTROL_API){ // userspace
+    // bidirectional connection to the userspace portion of driver
+    dbg("%s","bidirectional connection to userspace open");
+    mqueue = kmalloc(sizeof(x10mqueue_t),GFP_KERNEL);
+    file->private_data = (void *)mqueue;
+    atomic_set(&mqueue->head,0);
+    atomic_set(&mqueue->tail,0);
+    spin_lock_init(&mqueue->spinlock);
+  }
+  else if (major == x10api.control_major) {
+  }
+  else {  // if (major = x10api.control_data)
+  }
+
+  return 0;
+}
+
+static int x10_release (struct inode *inode, struct file *file)
 {
   int minor=XMINOR(file);
   int major=XMAJOR(file);
@@ -239,39 +273,20 @@ static int x10_data_open (struct inode *inode, struct file *file)
     dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
 
   if (major == x10api.control_major && hc == X10_CONTROL_API){
+    // bidirectional connection to the userspace portion of driver
+    x10api.us_connected = 0;
+    dbg("%s","bidirectional connection to userspace closed");
   }
   else if (major == x10api.control_major) {
   }
   else {  // if (major = x10api.control_data)
   }
-
+  kfree(file->private_data);
+  file->private_data = NULL;
   return 0;
 }
 
-static int x10_data_release (struct inode *inode, struct file *file)
-{
-  int minor=XMINOR(file);
-  int major=XMAJOR(file);
-  int hc = HOUSECODE(minor);
-  int uc = UNITCODE(minor);
-
-  ANNOUNCE;
-  dbg ("major=%d, minor=%d", major, minor);
-  if (major == x10api.control_major)
-    dbg ("(CTRL) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
-  else
-    dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
-
-  if (major == x10api.control_major && hc == X10_CONTROL_API){
-  }
-  else if (major == x10api.control_major) {
-  }
-  else {  // if (major = x10api.control_data)
-  }
-  return 0;
-}
-
-static unsigned int x10_data_poll (struct file *file, poll_table * pt)
+static unsigned int x10_poll (struct file *file, poll_table * pt)
 {
   int minor = XMINOR (file);
   int major = XMAJOR(file);
@@ -286,6 +301,7 @@ static unsigned int x10_data_poll (struct file *file, poll_table * pt)
     dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
 
   if (major == x10api.control_major && hc == X10_CONTROL_API){
+    // bidirectional connection to the userspace portion of driver
   }
   else if (major == x10api.control_major) {
   }
@@ -298,7 +314,7 @@ static unsigned int x10_data_poll (struct file *file, poll_table * pt)
   return (POLLERR);
 }
 
-static ssize_t x10_data_read (struct file *file, char *buffer, size_t length, loff_t * offset)
+static ssize_t x10_read (struct file *file, char *ubuffer, size_t length, loff_t * offset)
 {
   int minor = XMINOR (file);
   int major = XMAJOR (file);
@@ -314,6 +330,17 @@ static ssize_t x10_data_read (struct file *file, char *buffer, size_t length, lo
     dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
 
   if (major == x10api.control_major && hc == X10_CONTROL_API){
+    x10_message_t m;
+    // bidirectional connection to the userspace portion of driver
+    if (length < sizeof(x10_message_t)) {
+	dbg("%s","error:  Invalid message size");
+	return -EFAULT;
+    }
+    if (x10mqueue_get((x10mqueue_t *)file->private_data,&m))
+      return -EFAULT;
+    if (copy_to_user(ubuffer,&m,sizeof(x10_message_t))) 
+	return -EFAULT;
+    return(sizeof(x10_message_t));
   }
   else if (major == x10api.control_major) {
   }
@@ -323,12 +350,13 @@ static ssize_t x10_data_read (struct file *file, char *buffer, size_t length, lo
   return ret;
 }
 
-static ssize_t x10_data_write (struct file *file, const char *ubuffer, size_t length, loff_t * offset)
+static ssize_t x10_write (struct file *file, const char *ubuffer, size_t length, loff_t * offset)
 {
   int minor = XMINOR (file);
   int major = XMAJOR (file);
   int hc = HOUSECODE (minor);
   int uc = UNITCODE (minor);
+  x10_message_t message;
 
   ANNOUNCE;
   dbg ("major=%d, minor=%d", major, minor);
@@ -338,6 +366,14 @@ static ssize_t x10_data_write (struct file *file, const char *ubuffer, size_t le
     dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
 
   if (major == x10api.control_major && hc == X10_CONTROL_API){
+    // bidirectional connection to the userspace portion of driver
+    if (length < sizeof(message)) {
+	dbg("%s","error:  Invalid message size");
+	return -EFAULT;
+    }
+    if (copy_from_user(&message,ubuffer,sizeof(message)))
+	return -EFAULT;
+    return(x10_api_write(&message,(x10mqueue_t *)file->private_data));
   }
   else if (major == x10api.control_major) {
   }
@@ -348,7 +384,7 @@ static ssize_t x10_data_write (struct file *file, const char *ubuffer, size_t le
   return length;
 }
 
-static loff_t x10_data_llseek (struct file *file, loff_t offset, int origin)
+static loff_t x10_llseek (struct file *file, loff_t offset, int origin)
 {
   int minor = XMINOR (file);
   int major=XMAJOR(file);
@@ -371,5 +407,76 @@ static loff_t x10_data_llseek (struct file *file, loff_t offset, int origin)
 
   return -ESPIPE;
 }
+
+static int x10mqueue_add(x10mqueue_t *q,__u8 type,__u8 hc, __u8 uc, __u8 cmd, __u32 f)
+{
+  int head,tail,ret=1;
+  x10_message_t *message;
+
+  spin_lock(&q->spinlock);
+
+  tail = atomic_read(&q->tail);
+  head = atomic_read(&q->head);
+  message = &q->queue[tail];
+  message->type = type;
+  message->housecode = hc;
+  message->unitcode = uc;
+  message->command = cmd;
+  message->flag = f;
+
+  if (++tail >= MESSAGE_QUEUE_SIZE)
+    tail = 0;
+  if (tail != head) {
+    atomic_set(&q->tail,tail);
+    ret = 0;
+  }
+  spin_unlock(&q->spinlock);
+  return ret;
+}
+
+static int x10mqueue_get(x10mqueue_t *q,x10_message_t *m)
+{
+  int head,tail,ret=1;
+  x10_message_t *message;
+
+  spin_lock(&q->spinlock);
+
+  tail = atomic_read(&q->tail);
+  head = atomic_read(&q->head);
+  if (head != tail) {
+    message = &q->queue[head];
+    if (++head >= MESSAGE_QUEUE_SIZE)
+      head = 0;
+    atomic_set(&q->head,head);
+    memcpy(m,message,sizeof(x10_message_t));
+    ret = 0;
+  }
+  spin_unlock(&q->spinlock);
+  return 1;
+}
+
+ssize_t x10_api_write(x10_message_t *message,x10mqueue_t *q)
+{
+  switch (message->type) {
+    case X10_API:
+	if (message->command == X10_CMD_STATUS) {
+	  dbg("%s","X10_API connected");
+	  x10api.us_connected = 1;
+	  // OK...now write the status to the read queue
+	  if (x10mqueue_add(q,X10_API,0,0,X10_CMD_ON,0))
+	    return -EFAULT;
+	  return 0;
+	}
+	dbg("Invalid X10_API command %x",message->command);
+	break;
+    case X10_DATA:
+    case X10_CMD:
+    default:
+      dbg("Invalid message type %x",message->type);
+      break;
+  }
+  return -EFAULT;
+}
+
 
 MODULE_LICENSE ("GPL");
