@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.9 2004/01/06 03:46:14 whiles Exp whiles $
+ * $Id: dev.c,v 1.10 2004/01/14 03:16:11 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -65,7 +65,7 @@
 #define API_BUFFER 1024
 
 /* Here are some module parameters and definitions */
-int debug = 1;
+int debug = 0;
 MODULE_PARM (debug, "i");
 MODULE_PARM_DESC (debug, "turns on debug information (default=0)");
 static int nonblockread = 0;
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.9 2004/01/06 03:46:14 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.10 2004/01/14 03:16:11 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
