@@ -4,7 +4,7 @@
 #define DEFDEVICE "/dev/x10/.api"
 #define DEFPIDFILE "/var/run/x10d.pid"
 #define MAXHOSTNAMELEN 128
-#define CHILDSTACKSIZE 1024*256
+#define CHILDSTACKSIZE 1024*512
 
 #define dsyslog if(debug) syslog
 
@@ -22,5 +22,7 @@ extern int xmit_init(struct xcvrio *io);
 extern char *dumphex(char *hexbuffer,void *data, int len);
 
 extern int retries, delay, timeout, debug, fakereceive;
+
+#define dprintf if (debug) printf
 
 #endif
