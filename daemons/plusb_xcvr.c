@@ -1,6 +1,6 @@
 /*
  *
- * $Id: plusb_xcvr.c,v 1.8 2004/10/21 01:30:40 whiles Exp root $
+ * $Id: plusb_xcvr.c,v 1.9 2005/03/27 04:38:19 root Exp root $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -71,6 +71,8 @@
 
 #define USB_ENDPOINT_IN		0x81
 #define USB_ENDPOINT_OUT	0x01
+
+#define DELAY 1000
 
 int transmit(int hc, int uc, int cmd);
 static void startup();
@@ -190,7 +192,7 @@ int hidread(int fd,unsigned char *c, int length, int timeout)
   ioctl(fd,HIDIOCGREPORT,&hidout.rep_info);
   while (ioctl(fd, HIDIOCGREPORTINFO, &hidin.rep_info) >= 0) {
     dsyslog(LOG_INFO,"INPUT Report id: %d (%d fields)\n",hidin.rep_info.report_id,hidin.rep_info.num_fields);
-    if (hold > 0) usleep(hold*250);
+    if (delay > 0) usleep(delay*250);
     for (alv = 0; alv < hidin.rep_info.num_fields; alv++) {
       memset(&hidin.field_info,0,sizeof(hidin.field_info));
       hidin.field_info.report_type = hidin.rep_info.report_type;
@@ -198,7 +200,7 @@ int hidread(int fd,unsigned char *c, int length, int timeout)
       hidin.field_info.field_index = alv;
       ioctl(fd, HIDIOCGFIELDINFO, &hidin.field_info);
       dsyslog(LOG_INFO,"INPUT Field: %d: app: %04x phys %04x flags %x (%d usages) unit %x exp %d\n", alv, hidin.field_info.application, hidin.field_info.physical, hidin.field_info.flags, hidin.field_info.maxusage, hidin.field_info.unit, hidin.field_info.unit_exponent);
-      if (hold > 0) usleep(hold*250);
+      if (delay > 0) usleep(delay*250);
       memset(&hidin.usage_ref, 0, sizeof(hidin.usage_ref));
       for (yalv = 0; yalv < hidin.field_info.maxusage; yalv++) {
         hidin.usage_ref.report_type = hidin.field_info.report_type;
@@ -208,7 +210,7 @@ int hidread(int fd,unsigned char *c, int length, int timeout)
         ioctl(fd, HIDIOCGUCODE, &hidin.usage_ref);
         ioctl(fd, HIDIOCGUSAGE, &hidin.usage_ref);
         dsyslog(LOG_INFO,"INPUT Usage: %04x val %02x idx %x\n", hidin.usage_ref.usage_code,hidin.usage_ref.value, hidin.usage_ref.usage_index);
-        if (hold > 0) usleep(hold*250);
+        if (delay > 0) usleep(delay*250);
         c[hidin.usage_ref.usage_index] = hidin.usage_ref.value;
       }
     }
@@ -229,7 +231,7 @@ __s32 statusrequest() {
   do {
     ret = hidwrite(serial,start,sizeof(start));
     if (ret == EBUSY)
-      usleep(delay*1000);
+      usleep(DELAY*1000);
   } while (ret < 0 && (i++ < retries));
   if (ret < 0) {
     syslog(LOG_INFO,"USB Powerlinc initialization failed on status request (%s)\n",strerror(errno));
@@ -240,7 +242,7 @@ __s32 statusrequest() {
   do {
     ret = hidread(serial,start,sizeof(start),timeout);
     if (ret == EBUSY)
-      usleep(delay*1000);
+      usleep(DELAY*1000);
   } while (ret < 0 && (i++ < retries));
   if (ret < 0) {
     syslog(LOG_INFO,"USB Powerlinc initialization failed to return status (%s)\n",strerror(errno));
@@ -289,7 +291,7 @@ int hidinit(int fd)
   hidin.rep_info.report_id = HID_REPORT_ID_FIRST;
   while (ioctl(fd, HIDIOCGREPORTINFO, &hidin.rep_info) >= 0) {
     dsyslog(LOG_INFO,"INPUT Report id: %d (%d fields)\n",hidin.rep_info.report_id,hidin.rep_info.num_fields);
-    if (hold > 0) usleep(hold*250);
+    if (delay > 0) usleep(delay*250);
     for (alv = 0; alv < hidin.rep_info.num_fields; alv++) {
       memset(&hidin.field_info,0,sizeof(hidin.field_info));
       hidin.field_info.report_type = hidin.rep_info.report_type;
@@ -297,7 +299,7 @@ int hidinit(int fd)
       hidin.field_info.field_index = alv;
       ioctl(fd, HIDIOCGFIELDINFO, &hidin.field_info);
       dsyslog(LOG_INFO,"INPUT Field: %d: app: %04x phys %04x flags %x (%d usages) unit %x exp %d\n", alv, hidin.field_info.application, hidin.field_info.physical, hidin.field_info.flags, hidin.field_info.maxusage, hidin.field_info.unit, hidin.field_info.unit_exponent);
-      if (hold > 0) usleep(hold*250);
+      if (delay > 0) usleep(delay*250);
       memset(&hidin.usage_ref, 0, sizeof(hidin.usage_ref));
       for (yalv = 0; yalv < hidin.field_info.maxusage; yalv++) {
         hidin.usage_ref.report_type = hidin.field_info.report_type;
@@ -307,7 +309,7 @@ int hidinit(int fd)
         ioctl(fd, HIDIOCGUCODE, &hidin.usage_ref);
         ioctl(fd, HIDIOCGUSAGE, &hidin.usage_ref);
         dsyslog(LOG_INFO,"INPUT Usage: %04x val %02x idx %x\n", hidin.usage_ref.usage_code,hidin.usage_ref.value, hidin.usage_ref.usage_index);
-        if (hold > 0) usleep(hold*250);
+        if (delay > 0) usleep(delay*250);
       }
     }
     hidin.rep_info.report_id |= HID_REPORT_ID_NEXT;
@@ -316,7 +318,7 @@ int hidinit(int fd)
   hidout.rep_info.report_id = HID_REPORT_ID_FIRST;
   while (ioctl(fd, HIDIOCGREPORTINFO, &hidout.rep_info) >= 0) {
     dsyslog(LOG_INFO,"OUTPUT Report id: %d (%d fields)\n",hidout.rep_info.report_id,hidout.rep_info.num_fields);
-    if (hold > 0) usleep(hold*250);
+    if (delay > 0) usleep(delay*250);
     for (alv = 0; alv < hidout.rep_info.num_fields; alv++) {
       memset(&hidout.field_info,0,sizeof(hidout.field_info));
       hidout.field_info.report_type = hidout.rep_info.report_type;
@@ -324,7 +326,7 @@ int hidinit(int fd)
       hidout.field_info.field_index = alv;
       ioctl(fd, HIDIOCGFIELDINFO, &hidout.field_info);
       dsyslog(LOG_INFO,"OUTPUT Field: %d: app: %04x phys %04x flags %x (%d usages) unit %x exp %d\n", alv, hidout.field_info.application, hidout.field_info.physical, hidout.field_info.flags, hidout.field_info.maxusage, hidout.field_info.unit, hidout.field_info.unit_exponent);
-      if (hold > 0) usleep(hold*250);
+      if (delay > 0) usleep(delay*250);
       memset(&hidout.usage_ref, 0, sizeof(hidout.usage_ref));
       for (yalv = 0; yalv < hidout.field_info.maxusage; yalv++) {
         hidout.usage_ref.report_type = hidout.field_info.report_type;
@@ -334,7 +336,7 @@ int hidinit(int fd)
         ioctl(fd, HIDIOCGUCODE, &hidout.usage_ref);
 //        ioctl(fd, HIDIOCGUSAGE, &hidout.usage_ref);
         dsyslog(LOG_INFO,"OUTPUT Usage: %04x val %02x idx %x\n", hidout.usage_ref.usage_code,hidout.usage_ref.value, hidout.usage_ref.usage_index);
-        if (hold > 0) usleep(hold*250);
+        if (delay > 0) usleep(delay*250);
       }
     }
     hidout.rep_info.report_id |= HID_REPORT_ID_NEXT;
@@ -350,13 +352,13 @@ int hidinit(int fd)
   do {
     ret = hidwrite(serial,start,sizeof(start));
     if (ret == EBUSY)
-      usleep(delay*1000);
+      usleep(DELAY*1000);
     else if (ret < 0) {
       syslog(LOG_INFO,"USB Powerlinc initialization failed on setup1 (%s)\n",strerror(errno));
       goto error;
     }
   } while (ret < 0);
-  if (hold > 0) usleep(hold*250);
+  if (delay > 0) usleep(delay*250);
   start[0] = X10_PLUSB_XMITCTRL;
   start[1] = X10_PLUSB_TCTRLRSTCONT       // make sure continuous is off
            | X10_PLUSB_TCTRLRSTFLAG       // turn off flagging services
@@ -366,13 +368,13 @@ int hidinit(int fd)
   do {
     ret = hidwrite(serial,start,sizeof(start));
     if (ret == EBUSY)
-      usleep(delay*1000);
+      usleep(DELAY*1000);
     else if (ret < 0) {
       syslog(LOG_INFO,"USB Powerlinc initialization failed on setup2 (%s)\n",strerror(errno));
       goto error;
     }
   } while (ret < 0);
-  if (hold > 0) usleep(hold*250);
+  if (delay > 0) usleep(delay*250);
   dsyslog(LOG_INFO,"USB PowerLinc stages 1 and 2 complete\n");
   status = statusrequest();
   if (status < 0)
@@ -383,8 +385,8 @@ done:
   io->status = 0;
   fakereceive = 1;
   sem_post(&io->connected);
-  if (delay < 1000)
-    delay = 1000;
+//  if (DELAY < 1000)
+//    DELAY = 1000;
   sem_init(&cts,0,1);
   startup();
   return 0;
@@ -485,7 +487,7 @@ static int waitforack(int timeout)
       dsyslog(LOG_INFO,"received ACK/NAK\n");
       return ack;
     }
-    usleep(delay*1000);
+    usleep(DELAY*1000);
   }
   return 0;
 }
@@ -520,7 +522,7 @@ static int sem_wait_timeout(sem_t *sem,int timeout)
   for (i = 0; i < timeout; i++) {
     if (sem_trywait(sem) != 0) 
       return 0;
-    usleep(delay*1000);
+    usleep(DELAY*1000);
   }
   dsyslog(LOG_INFO,"timeout waiting for transmitter\n",timeout);
   return 1;
@@ -556,11 +558,11 @@ int transmit(int hc, int uc, int cmd)
       if (status < 0)
         goto done;
     } while (status & 0x06000000); */
-    usleep(delay*1000);
+    usleep(DELAY*1000);
     do {
       ret = hidwrite(serial, (unsigned char *)&data, sizeof(data));
       if (ret == EBUSY)
-        usleep(delay*1000);
+        usleep(DELAY*1000);
       else if (ret < 0) {
         dsyslog(LOG_INFO,"Error writing to device (%s)\n",strerror(errno));
         goto done;
@@ -576,11 +578,11 @@ int transmit(int hc, int uc, int cmd)
   if (cmd >= 0){          // negative value for cmd causes us to skip cmd
     data.d.byte[i] = functioncode[cmd] | 0x60;
     dsyslog(LOG_INFO,"sending %s", dumphex(scratch,(void *) &data, sizeof(data)));
-    usleep(delay*1000);
+    usleep(DELAY*1000);
     do {
       ret = hidwrite(serial, (unsigned char *)&data, sizeof(data));
       if (ret == EBUSY)
-        usleep(delay*1000);
+        usleep(DELAY*1000);
       else if (ret < 0) {
         dsyslog(LOG_INFO,"Error writing to device (%s)\n",strerror(errno));
         goto done;
