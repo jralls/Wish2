@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.14 2004/01/19 18:21:48 whiles Exp whiles $
+ * $Id: dev.c,v 1.15 2004/02/21 02:23:48 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -65,7 +65,7 @@
 #define API_BUFFER 1024
 
 /* Here are some module parameters and definitions */
-int debug = 0;
+static int debug = 0;
 MODULE_PARM (debug, "i");
 MODULE_PARM_DESC (debug, "turns on debug information (default=0)");
 static int nonblockread = 0;
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.14 2004/01/19 18:21:48 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.15 2004/02/21 02:23:48 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
@@ -1017,7 +1017,7 @@ static ssize_t control_read(struct file *file,char *buffer,size_t length, loff_t
       break;
     case X10_CONTROL_DUMPLOG:
       if (target == 0) {
-        if ((*offset==(loff_t)atomic_read(&log.end))&(file->f_flags&O_NONBLOCK))
+        if ((*offset==(loff_t)atomic_read(&log.end))&&(file->f_flags&O_NONBLOCK))
           return 0;
         if (wait_event_interruptible(log.changed,(int)*offset != (loff_t)atomic_read(&log.end)))
           return 0;
