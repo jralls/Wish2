@@ -1,6 +1,6 @@
 /*
  *
- * $Id: plusb_xcvr.c,v 1.4 2004/02/19 04:44:46 whiles Exp whiles $
+ * $Id: plusb_xcvr.c,v 1.5 2004/02/21 02:22:09 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -234,7 +234,7 @@ __s32 statusrequest() {
     syslog(LOG_INFO,"Timeout waiting for response from PowerLinc\n");
     return -1;
   }
-  return ((start[0]&0x7f)<<24) | start[1]<<16 | start[2]<<8 | start[3];
+  return((start[0]&0x7f)<<24 | start[1]<<16 | start[3]<<8 | start[4]);
 }
 
 int hidinit(int fd)
@@ -357,6 +357,7 @@ int hidinit(int fd)
 
 done:
   io->status = 0;
+  fakereceive = 1;
   sem_post(&io->connected);
   if (delay < 1000)
     delay = 1000;
@@ -460,7 +461,7 @@ static int waitforack(int timeout)
       dsyslog(LOG_INFO,"received ACK/NAK\n");
       return ack;
     }
-    usleep(1000);
+    usleep(delay*1000);
   }
   return 0;
 }
@@ -491,11 +492,11 @@ static int sem_wait_timeout(sem_t *sem,int timeout)
 {
   int i;
 
-  dsyslog(LOG_INFO,"sem_wait_timeout: timeout %d\n",timeout);
+  dsyslog(LOG_INFO,"sem_wait_timeout: timeout=%d\n",timeout);
   for (i = 0; i < timeout; i++) {
     if (sem_trywait(sem) != 0) 
       return 0;
-    usleep(1000);
+    usleep(delay*1000);
   }
   dsyslog(LOG_INFO,"timeout waiting for transmitter\n",timeout);
   return 1;
