@@ -4,7 +4,6 @@
 #define DEFDEVICE "/dev/x10/.api"
 #define DEFPIDFILE "/var/run/x10d.pid"
 #define MAXHOSTNAMELEN 128
-#define CHILDSTACKSIZE 1024*512
 
 #define dsyslog if(debug) syslog
 
