@@ -21,7 +21,7 @@ fi
 BUILDDIR="/tmp/$KERNEL-buildroot"
 rm -rf $BUILDDIR
 mkdir -p $BUILDDIR
-tar cf - . | (cd $BUILDDIR; tar xvf -)
+tar cf - . | (cd $BUILDDIR; tar xf -)
 
 echo "...creating spec file"
 
