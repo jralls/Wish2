@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.12 2004/01/16 20:36:33 whiles Exp whiles $
+ * $Id: dev.c,v 1.13 2004/01/16 23:05:30 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.12 2004/01/16 20:36:33 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.13 2004/01/16 23:05:30 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
@@ -870,7 +870,11 @@ ssize_t api_write(x10_message_t *message,x10mqueue_t *q)
 	break;
     case X10_CONTROL:
 	dbg("%s","X10_API control");
-        log_store((int)message->flag,message->housecode,message->unitcode,message->command);
+	if (message->unitcode >=0 && message->command >= 0){
+        	log_store((int)message->flag,message->housecode,message->unitcode,-1);
+       		log_store((int)message->flag,message->housecode,-1,message->command);
+	} else 
+        	log_store((int)message->flag,message->housecode,message->unitcode,message->command);
 	return sizeof(x10_message_t);
 	break;
     default:
