@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.9 2004/02/29 03:01:38 whiles Exp whiles $
+ * $Id: pl_xcvr.c,v 1.10 2004/06/21 03:49:09 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -259,7 +259,7 @@ static int sem_wait_timeout(sem_t *sem,int timeout)
 {
   int i;
 
-  dsyslog(LOG_INFO,"sem_wait_timeout: timeout %d\n",timeout);
+  dsyslog(LOG_INFO,"sem_wait_timeout: timeout=%d\n",timeout);
   for (i = 0; i < timeout; i++) {
     if (sem_trywait(sem) != 0) 
       return 0;
@@ -349,14 +349,14 @@ static void decode(unsigned char *buf, int count)
     updateack(-1);
   }
   else if (buf[0] == X10_PL_EXTDATASTART){        // 0x45='E'
-    dsyslog(LOG_INFO,"Error:  Extended data not supported");
+    dsyslog(LOG_INFO,"Error:  Extended data not supported\n");
   }
   else if (buf[0] == X10_PL_XMITRCV || buf[0] == X10_PL_XMITRCVSELF) {
     data = (struct pl_cmd *) buf;
     dsyslog(LOG_INFO,"packet:  hc=0x%x, uc=0x%x, fc=0x%x\n",data->hc, data->uc, data->fc);
     hc = decode_housecode(data->hc & ~0x40);
     if (hc < 0 || hc >= MAX_HOUSECODES) {
-      dsyslog(LOG_INFO,"invalid housecode 0x%x", data->hc);
+      dsyslog(LOG_INFO,"invalid housecode 0x%x\n", data->hc);
       return;
     }
     uc = decode_unitcode(data->uc & ~0x40);
@@ -365,10 +365,10 @@ static void decode(unsigned char *buf, int count)
 
     dsyslog(LOG_INFO,"calling receiver...\n");
     if (io->received(hc, uc, fc,NULL,0))
-      dsyslog(LOG_INFO,"unknown cmd %s", dumphex(scratch,buf, count));
+      dsyslog(LOG_INFO,"unknown cmd %s\n", dumphex(scratch,buf, count));
   }
   else {
-    dsyslog(LOG_INFO,"unable to handle data %s",dumphex(scratch,buf,count));
+    dsyslog(LOG_INFO,"unable to handle data %s\n",dumphex(scratch,buf,count));
   }
 }
 
@@ -390,6 +390,7 @@ static void start()
     if (flags > 0){
       buf[index++] = c;
       if (index >= sizeof(buf) || c == X10_PL_CR) {
+	dsyslog(LOG_INFO,"Data Ready: Calling decode()\n");
         decode(buf,index);
         index = 0;
       }
@@ -399,4 +400,5 @@ static void start()
       exit (-1);
     }
   }
+  syslog(LOG_INFO,"ERROR:  I died!!!\n");
 }
