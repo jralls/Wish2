@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: x10_dev.c,v 1.3 2004/01/01 17:23:16 whiles Exp whiles $
+ * $Id: x10_dev.c,v 1.4 2004/01/01 21:01:32 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -56,8 +56,8 @@
 #include <linux/version.h>
 
 #define __X10_MODULE__
-#include "x10_dev.h"
 #include "x10.h"
+#include "x10_dev.h"
 
 #define DATA_DEVICE_NAME "x10d"
 #define CONTROL_DEVICE_NAME "x10c"
@@ -79,7 +79,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: x10_dev.c,v 1.3 2004/01/01 17:23:16 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: x10_dev.c,v 1.4 2004/01/01 21:01:32 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
@@ -274,8 +274,10 @@ static int x10_release (struct inode *inode, struct file *file)
 
   if (major == x10api.control_major && hc == X10_CONTROL_API){
     // bidirectional connection to the userspace portion of driver
-    x10api.us_connected = 0;
-    dbg("%s","bidirectional connection to userspace closed");
+    if (x10api.us_connected != 0) {
+      x10api.us_connected = 0;
+      dbg("%s","bidirectional connection to userspace closed");
+    }
   }
   else if (major == x10api.control_major) {
   }
