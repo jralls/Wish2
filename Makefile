@@ -21,17 +21,17 @@
 all:
 	(cd daemons; make)
 	(cd utils; make)
-	(cd dev; build.sh)
+	(cd dev; ./make.sh)
 
 clean:
 	(cd daemons; make clean)
 	(cd utils; make clean)
-	(cd dev; make clean)
+	(cd dev; ./make.sh clean)
 
 install:
 	sh ./scripts/install.sh $(KERNELDIR)
 ifneq (/dev/x10,$(wildcard /dev/x10))
 	sh ./scripts/makedev.sh
 endif
-	(cd dev; make install)
+	(cd dev; ./make.sh install)
 
