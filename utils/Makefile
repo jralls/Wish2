@@ -1,6 +1,6 @@
 #
 #
-# $Id: Makefile,v 1.1 2004/01/01 21:35:23 whiles Exp whiles $
+# $Id: Makefile,v 1.2 2004/02/21 02:25:22 whiles Exp whiles $
 #
 INC=-I/usr/src/linux/include -I..
 CC=gcc
@@ -21,7 +21,7 @@ x10watch: x10watch.c Makefile
 	$(CC) $(INC) $@.c -o $@
 
 clean:
-	rm nbread x10watch x10logd
+	rm nbread x10watch x10logd nbecho
 	rm -f .depend
 	rm -f .depend.bak
 
