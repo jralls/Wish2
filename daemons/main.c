@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.6 2004/01/11 21:18:30 whiles Exp whiles $
+ * $Id: main.c,v 1.7 2004/01/14 03:16:21 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -65,7 +65,9 @@ static char *progname;				// name used to start program
 static char *logtag;				// tag to add to log lines
 static int syslog_facility=LOG_LOCAL5;
 static int api;					// file handle for the API interface
-static int timeout=10;				// timeout for waiting for response from API
+int timeout=10;				// timeout for waiting for response from API
+int retries=5;				// retries for failures
+int delay=0;				// delay before retrying
 static int xmitpid=0;				// pid for transmitter thread
 static char *serial=NULL;			// serial device
 static void **xmitstack;			// stack space for transmit thread
@@ -121,6 +123,12 @@ int main(int argc,char *argv[])
     } else if (!strcasecmp(&arg[1],"device")) {
       TESTNEXTARG;
       serial = argv[++i];
+    } else if (!strcasecmp(&arg[1],"retries")) {
+      TESTNEXTARG;
+      retries = atoi(argv[++i]);
+    } else if (!strcasecmp(&arg[1],"delay")) {
+      TESTNEXTARG;
+      delay = atoi(argv[++i]);
     } else if (!strcasecmp(&arg[1],"timeout")) {
       TESTNEXTARG;
       timeout = atoi(argv[++i]);
@@ -171,7 +179,7 @@ void start()
     for (i = 0; i < timeout; i++) {
       memset(&m,0,sizeof(m));
       if (read(api,&m,sizeof(m)) != sizeof(m))
-        syslog(LOG_INFO,"Error:  Incorrect byte count read from %s\n",device);
+        dsyslog(LOG_INFO,"Error:  Incorrect byte count read from %s\n",device);
       if (m.source == X10_API && m.command == X10_CMD_ON) {
         syslog(LOG_INFO,"Successfully opened X10 API device %s\n",device);
         connected = 1;
@@ -235,6 +243,8 @@ void syntax(int argc, char *argv[], int i)
   fprintf(stderr,"         -pid pidfile - File to write driver PID to (default: %s)\n",defpidfile);
   fprintf(stderr,"         -tag logtag  - Tag to be written to syslog (default: %s)\n",progname);
   fprintf(stderr,"         -timeout #   - Timeout while waiting for response from api (default: 10)\n");
+  fprintf(stderr,"         -retries #   - Number of times to retry on failure (default: 1)\n");
+  fprintf(stderr,"         -delay #     - Number of seconds to delay after failure (default: 0)\n");
   fprintf(stderr,"         -debug       - Turn on debug mode\n");
   fprintf(stderr,"         -device	- transceiver device file\n");
 }
@@ -281,6 +291,7 @@ static sighandler_type die(int sig)
 
 static int tty_received(int hc, int uc, int fc, unsigned char *buf, int len)
 {
+  dsyslog(LOG_INFO,"tty_received: hc=0x%x, uc=0x%x, fc=0x%x\n",hc,uc,fc);
   return(update_state(0,hc,uc,fc,buf,len));
 }
 
@@ -299,7 +310,7 @@ static void listen()
   xcvrio.debug = debug;
   xcvrio.logtag = logtag;
   xmitstack = malloc(CHILDSTACKSIZE);
-  syslog(LOG_INFO,"starting transceiver\n");
+  dsyslog(LOG_INFO,"starting transceiver\n");
   xmitpid = clone((int (*)(void *))xmit_init,xmitstack,CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_PTRACE | CLONE_VM,(void *)&xcvrio);
   if (xmitpid < 0) {
     syslog(LOG_INFO, "unable to clone, exiting - %s\n",strerror(errno));
@@ -308,7 +319,7 @@ static void listen()
     exit(-1);
   }
   sem_wait(&xcvrio.connected);
-  syslog(LOG_INFO,"got connect message\n");
+  dsyslog(LOG_INFO,"got connect message\n");
   if (xcvrio.status != 0) {
     syslog(LOG_INFO,"unable to start transmitter, exiting\n");
     unlink(pidfile);
@@ -323,11 +334,11 @@ static void listen()
     memset(&m,0,sizeof(m));
     n = read(api,&m,sizeof(m));
     if (n < 0) {
-      syslog(LOG_INFO,"Error reading API interface - %s\n",strerror(errno));
+      dsyslog(LOG_INFO,"Error reading API interface - %s\n",strerror(errno));
       continue;
     }
     if (n != sizeof(m)) {
-      syslog(LOG_INFO,"Error - incorrect API byte count, got %d, should have gotten %d\n",n,sizeof(m));
+      dsyslog(LOG_INFO,"Error - incorrect API byte count, got %d, should have gotten %d\n",n,sizeof(m));
       continue;
     }
     dsyslog(LOG_INFO,"X10 message: src=0x%x, hc=0x%x, uc=0x%x, cmd=0x%x, f=0x%x\n",m.source,m.housecode,m.unitcode,m.command,m.flag);
@@ -359,7 +370,7 @@ static int updatelog(int dir, int hc, int uc, int cmd)
     return 0;
   }
   else{
-    syslog(LOG_INFO,"Error - write did not complete\n");
+    dsyslog(LOG_INFO,"Error - write did not complete\n");
     return -1;
   }
 }
@@ -378,7 +389,7 @@ static int updatestatus(int hc, int uc, int cmd, int value)
     return 0;
   }
   else{
-    syslog(LOG_INFO,"Error - write did not complete\n");
+    dsyslog(LOG_INFO,"Error - write did not complete\n");
     return -1;
   }
 }
