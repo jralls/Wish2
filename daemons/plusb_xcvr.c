@@ -1,6 +1,6 @@
 /*
  *
- * $Id: plusb_xcvr.c,v 1.3 2004/02/18 04:46:22 whiles Exp whiles $
+ * $Id: plusb_xcvr.c,v 1.4 2004/02/19 04:44:46 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -58,7 +58,7 @@
 #include <linux/usbdevice_fs.h>
 #include <linux/hiddev.h>
 
-#include "../include/x10.h"
+#include "x10.h"
 #include "x10d.h"
 #include "plusb_xcvr.h"
 

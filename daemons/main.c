@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.10 2004/01/16 20:35:04 whiles Exp whiles $
+ * $Id: main.c,v 1.11 2004/01/17 20:51:07 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -50,8 +50,8 @@
 #include <asm/types.h>
 #include <semaphore.h>
 
-#include "../include/x10.h"
-#include "../fs/strings.h"
+#include "x10.h"
+#include "strings.h"
 #include "x10d.h"
 
 #define sighandler_type void

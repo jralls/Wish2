@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.6 2004/01/16 23:17:31 whiles Exp whiles $
+ * $Id: pl_xcvr.c,v 1.7 2004/01/17 20:50:47 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -55,7 +55,7 @@
 
 #include <asm/types.h>
 
-#include "../include/x10.h"
+#include "x10.h"
 #include "x10d.h"
 #include "pl_xcvr.h"
 

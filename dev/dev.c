@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.13 2004/01/16 23:05:30 whiles Exp whiles $
+ * $Id: dev.c,v 1.14 2004/01/19 18:21:48 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -56,7 +56,7 @@
 #include <linux/version.h>
 
 #define __X10_MODULE__
-#include "../include/x10.h"
+#include "x10.h"
 #include "strings.h"
 #include "dev.h"
 
@@ -83,7 +83,7 @@ MODULE_PARM_DESC(data_major, "Major character device for communicating with indi
 MODULE_PARM(control_major, "i");
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.13 2004/01/16 23:05:30 whiles Exp whiles $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.14 2004/01/19 18:21:48 whiles Exp whiles $"
 char *version = DRIVER_VERSION;
 
 static __inline__ int XMAJOR (struct file *a)
