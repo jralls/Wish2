@@ -7,12 +7,15 @@
 #define MAX_LOG 		32
 
 typedef struct x10message {
-  __u8		source;		// Where did the message come from/go to
-  __u8		housecode;	// 0-16
-  __u8		unitcode;	// 0-16
-  __u8		command;	// see X10_CMD_* below
+  int		source;		// Where did the message come from/go to
+  int		housecode;	// 0-16
+  int		unitcode;	// 0-16
+  int		command;	// see X10_CMD_* below
   __u32		flag;		// flags (see below)
 } x10_message_t;
+
+#define MAX_HOUSECODES 16
+#define MAX_UNITS 16
 
 // Values for the source field
 #define X10_CONTROL		0x01
