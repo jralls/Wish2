@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.8 2004/01/16 16:27:55 whiles Exp whiles $
+ * $Id: main.c,v 1.9 2004/01/16 17:51:54 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -351,9 +351,9 @@ static void listen()
         break;
       case X10_DATA:
       case X10_CONTROL:
-        xcvrio.send(m.housecode,m.unitcode==0xff?-1:m.unitcode,m.command==0xff?-1:m.command);
+        xcvrio.send(m.housecode,m.unitcode,m.command);
 	if (fakereceive == 1)
-          update_state(1,m.housecode,m.unitcode==0xff?-1:m.unitcode,m.command==0xff?-1:m.command,NULL,0);
+          update_state(1,m.housecode,m.unitcode,m.command,NULL,0);
         break;
       default:
         dsyslog(LOG_INFO,"Error - invalid API source %d\n",m.source);
