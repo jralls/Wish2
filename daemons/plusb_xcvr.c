@@ -1,6 +1,6 @@
 /*
  *
- * $Id: plusb_xcvr.c,v 1.1 2004/01/18 18:20:30 whiles Exp whiles $
+ * $Id: plusb_xcvr.c,v 1.2 2004/01/19 04:47:05 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -62,8 +62,8 @@
 #include "x10d.h"
 #include "plusb_xcvr.h"
 
-#define USB_ENDPOINT_IN		0x80
-#define USB_ENDPOINT_OUT	0x00
+#define USB_ENDPOINT_IN		0x81
+#define USB_ENDPOINT_OUT	0x01
 
 int transmit(int hc, int uc, int cmd);
 static void startup();
@@ -74,60 +74,155 @@ sem_t sem_ack;
 int ack;
 sem_t cts;
 
+
+struct plusb {
+  struct hiddev_report_info rep_info;
+  struct hiddev_usage_ref usage_ref;
+  struct hiddev_field_info field_info;
+} hidout,hidin;
+
 int hidwrite(int fd,unsigned char *c,int length)
 {
-  struct usbdevfs_bulktransfer data;
-  int ret,sent = 0;
+  int ret;
+  int i,alv,yalv;
+  char scratch[80];
+
+  return length;
+/*
+  hidout.rep_info.report_type = HID_REPORT_TYPE_OUTPUT;
+  hidout.rep_info.report_id = HID_REPORT_ID_FIRST;
+  while (ioctl(fd, HIDIOCGREPORTINFO, &hidout.rep_info) >= 0) {
+    dsyslog(LOG_INFO,"OUTPUT Report id: %d (%d fields)\n",hidout.rep_info.report_id,hidout.rep_info.num_fields);
+    for (alv = 0; alv < hidout.rep_info.num_fields; alv++) {
+      memset(&hidout.field_info,0,sizeof(hidout.field_info));
+      hidout.field_info.report_type = hidout.rep_info.report_type;
+      hidout.field_info.report_id = hidout.rep_info.report_id;
+      hidout.field_info.field_index = alv;
+      ioctl(fd, HIDIOCGFIELDINFO, &hidout.field_info);
+      dsyslog(LOG_INFO,"OUTPUT Field: %d: app: %04x phys %04x flags %x (%d usages) unit %x exp %d\n", alv, hidout.field_info.application, hidout.field_info.physical, hidout.field_info.flags, hidout.field_info.maxusage, hidout.field_info.unit, hidout.field_info.unit_exponent);
+      memset(&hidout.usage_ref, 0, sizeof(hidout.usage_ref));
+      for (yalv = 0; yalv < hidout.field_info.maxusage; yalv++) {
+        hidout.usage_ref.report_type = hidout.field_info.report_type;
+        hidout.usage_ref.report_id = hidout.field_info.report_id;
+        hidout.usage_ref.field_index = alv;
+        hidout.usage_ref.usage_index = yalv;
+        ioctl(fd, HIDIOCGUCODE, &hidout.usage_ref);
+        ioctl(fd, HIDIOCGUSAGE, &hidout.usage_ref);
+        dsyslog(LOG_INFO,"OUTPUT Usage: %04x val %02x idx %x\n", hidout.usage_ref.usage_code,hidout.usage_ref.value, hidout.usage_ref.usage_index);
+      }
+    }
+    hidout.rep_info.report_id |= HID_REPORT_ID_NEXT;
+  }
+*/
+  for (i = 0; i < hidout.field_info.maxusage; i++) {
+    hidout.usage_ref.report_type = hidout.rep_info.report_type;
+    hidout.usage_ref.report_id = 0;
+    hidout.usage_ref.field_index = 0;
+    hidout.usage_ref.usage_index = i;
+    hidout.usage_ref.value = c[i];
+    ioctl(fd,HIDIOCSUSAGE,&hidout.usage_ref);
+  }
   
-  data.ep &= ~USB_ENDPOINT_IN;
-  data.len = length;
-  data.timeout = 0;
-  data.data = c;
-  ret = ioctl(fd,USBDEVFS_BULK,&data);
-  return ret;
+  hidout.rep_info.report_type = HID_REPORT_TYPE_OUTPUT;
+  hidout.rep_info.report_id = 0;
+  hidout.rep_info.num_fields = 1;
+  ret = ioctl(fd,HIDIOCSREPORT,&hidout.rep_info);
+  if (ret < 0){
+    dsyslog(LOG_INFO,"Error writing to USB device (%s)\n",strerror(errno));
+    return ret;
+  }
+  else 
+    dsyslog(LOG_INFO,"wrote %s\n",dumphex(scratch,(void *)c,length));
+
+  sleep(2);
+  
+  return length;
 }
 
+ struct hiddev_event ev[64];
 int hidread(int fd,unsigned char *c, int length, int timeout)
 {
-  struct usbdevfs_bulktransfer data;
-  int ret,sent = 0;
-  
-  data.ep |= USB_ENDPOINT_IN;
-  data.len = length;
-  data.timeout = timeout;
-  data.data = c;
-  ret = ioctl(fd,USBDEVFS_BULK,&data);
-  return ret;
-}
+  fd_set fdset;
+  int rd;
+  int i;
+  struct timeval tv;
+  int alv,yalv;
 
-// xmit_init is the only function that is required.  It must set the xcvrio.send function
-// to a non-null value immediately
-//
-// return a non-zero number to indicate error
-int xmit_init(struct xcvrio *arg)
-{
-  ssize_t ret;
-  struct hiddev_devinfo usbinfo;
-  struct pl_cmd data;
-  unsigned char start[8];
-
-  syslog(LOG_INFO,"Transmit thread starting\n");
-  sem_init(&sem_ack,0,0);
-  io = arg;
-  io->status = 1;
-  io->send = transmit;
-  // Now, connect up and set the status to 0 if successful.  Finally, post to the semaphore to let
-  // the parent know that all is well...then just wait for input from the device...
-  serial = open(io->device,O_RDWR | O_NOCTTY);
-  if (serial < 0) {
-    syslog(LOG_INFO,"Error opening %s (%s)\n",io->device,strerror(errno));
-    goto error;
+//  timeout = 0;
+  tv.tv_sec = 0;
+  tv.tv_usec = timeout * 1000;
+  FD_ZERO(&fdset);
+  i = 0;
+  FD_SET(fd,&fdset);
+  rd = select(fd+1,&fdset,NULL,NULL,(timeout <= 0 ? NULL : &tv));
+  if (rd < 0) {
+    dsyslog(LOG_INFO,"Error reading USB device - %s\n",strerror(errno));
+    return rd;
   }
+  if (rd == 0) {
+//    dsyslog(LOG_INFO,"hidread timeout\n");
+    return 0;  // timeout
+  }
+
+  // now we have an event ready to go...
+  rd = read(fd,ev,sizeof(ev));
+  if (rd < 0){
+    dsyslog(LOG_INFO,"Error reading USB device - %s\n",strerror(errno));
+    return rd;
+  }
+  if (rd < sizeof(ev[0])){
+    dsyslog(LOG_INFO,"Error - got short read from USB device\n");
+    return -1;
+  }
+
+  // now read the report and usage fields
+  hidin.rep_info.report_type = HID_REPORT_TYPE_INPUT;
+  hidin.rep_info.report_id = HID_REPORT_ID_FIRST;
+  ioctl(fd,HIDIOCGREPORT,&hidout.rep_info);
+  while (ioctl(fd, HIDIOCGREPORTINFO, &hidin.rep_info) >= 0) {
+    dsyslog(LOG_INFO,"INPUT Report id: %d (%d fields)\n",hidin.rep_info.report_id,hidin.rep_info.num_fields);
+    for (alv = 0; alv < hidin.rep_info.num_fields; alv++) {
+      memset(&hidin.field_info,0,sizeof(hidin.field_info));
+      hidin.field_info.report_type = hidin.rep_info.report_type;
+      hidin.field_info.report_id = hidin.rep_info.report_id;
+      hidin.field_info.field_index = alv;
+      ioctl(fd, HIDIOCGFIELDINFO, &hidin.field_info);
+      dsyslog(LOG_INFO,"INPUT Field: %d: app: %04x phys %04x flags %x (%d usages) unit %x exp %d\n", alv, hidin.field_info.application, hidin.field_info.physical, hidin.field_info.flags, hidin.field_info.maxusage, hidin.field_info.unit, hidin.field_info.unit_exponent);
+      memset(&hidin.usage_ref, 0, sizeof(hidin.usage_ref));
+      for (yalv = 0; yalv < hidin.field_info.maxusage; yalv++) {
+        hidin.usage_ref.report_type = hidin.field_info.report_type;
+        hidin.usage_ref.report_id = hidin.field_info.report_id;
+        hidin.usage_ref.field_index = alv;
+        hidin.usage_ref.usage_index = yalv;
+        ioctl(fd, HIDIOCGUCODE, &hidin.usage_ref);
+        ioctl(fd, HIDIOCGUSAGE, &hidin.usage_ref);
+        dsyslog(LOG_INFO,"INPUT Usage: %04x val %02x idx %x\n", hidin.usage_ref.usage_code,hidin.usage_ref.value, hidin.usage_ref.usage_index);
+        c[hidin.usage_ref.usage_index] = hidin.usage_ref.value;
+      }
+    }
+    hidin.rep_info.report_id |= HID_REPORT_ID_NEXT;
+  }
+  return hidin.field_info.maxusage;
+}  
+
+int hidinit(int fd)
+{
+  struct hiddev_devinfo usbinfo;
+  struct hiddev_field_info field_info;
+  unsigned char start[8];
+  int report_type;
+  int appl,alv,yalv;
+  unsigned int intf;
+  ssize_t ret;
+
   dsyslog(LOG_INFO,"Connecting to USB Powerlinc Interface on %s\n",io->device);
-//  ioctl(serial,HIDIOCGDEVINFO,&usbinfo);
-//  ret = read(serial,(void *)&descriptor,sizeof(descriptor));
-  dsyslog(LOG_INFO,"%s: Vendor 0x%04hx, Product 0x%04hx version 0x%04hx\n",io->device,usbinfo.vendor,usbinfo.product,usbinfo.version);
-  dsyslog(LOG_INFO,"%s: %i application%s on bus %d, devnum %d, ifnum %d\n",io->device,usbinfo.num_applications,(usbinfo.num_applications==1?"":"s"),usbinfo.busnum,usbinfo.devnum,usbinfo.ifnum);
+  ioctl(serial,HIDIOCGDEVINFO,&usbinfo);
+  dsyslog(LOG_INFO,"%s: Vendor 0x%04hx, Product 0x%04hx version 0x%04hx\n",
+          io->device,usbinfo.vendor,usbinfo.product,usbinfo.version);
+  dsyslog(LOG_INFO,"%s: %i application%s on bus %d, devnum %d, ifnum %d\n",
+          io->device,usbinfo.num_applications,
+          (usbinfo.num_applications==1?"":"s"),usbinfo.busnum,
+          usbinfo.devnum,usbinfo.ifnum);
   if (usbinfo.vendor == 0x10bf) {
     syslog(LOG_INFO,"USB Powerinc version 0x%04hx found\n",usbinfo.version);
   }
@@ -135,6 +230,64 @@ int xmit_init(struct xcvrio *arg)
     syslog(LOG_INFO,"%s is not a USB PowerLinc\n",io->device);
     goto error;
   }
+  //
+  // now send the start command to initiate communications
+  //
+  if (ioctl(fd, HIDIOCINITREPORT,0) < 0) {
+    goto error;
+  }
+  hidin.rep_info.report_type = HID_REPORT_TYPE_INPUT;
+  hidin.rep_info.report_id = HID_REPORT_ID_FIRST;
+  while (ioctl(fd, HIDIOCGREPORTINFO, &hidin.rep_info) >= 0) {
+    dsyslog(LOG_INFO,"INPUT Report id: %d (%d fields)\n",hidin.rep_info.report_id,hidin.rep_info.num_fields);
+    for (alv = 0; alv < hidin.rep_info.num_fields; alv++) {
+      memset(&hidin.field_info,0,sizeof(hidin.field_info));
+      hidin.field_info.report_type = hidin.rep_info.report_type;
+      hidin.field_info.report_id = hidin.rep_info.report_id;
+      hidin.field_info.field_index = alv;
+      ioctl(fd, HIDIOCGFIELDINFO, &hidin.field_info);
+      dsyslog(LOG_INFO,"INPUT Field: %d: app: %04x phys %04x flags %x (%d usages) unit %x exp %d\n", alv, hidin.field_info.application, hidin.field_info.physical, hidin.field_info.flags, hidin.field_info.maxusage, hidin.field_info.unit, hidin.field_info.unit_exponent);
+      memset(&hidin.usage_ref, 0, sizeof(hidin.usage_ref));
+      for (yalv = 0; yalv < hidin.field_info.maxusage; yalv++) {
+        hidin.usage_ref.report_type = hidin.field_info.report_type;
+        hidin.usage_ref.report_id = hidin.field_info.report_id;
+        hidin.usage_ref.field_index = alv;
+        hidin.usage_ref.usage_index = yalv;
+        ioctl(fd, HIDIOCGUCODE, &hidin.usage_ref);
+        ioctl(fd, HIDIOCGUSAGE, &hidin.usage_ref);
+        dsyslog(LOG_INFO,"INPUT Usage: %04x val %d idx %x\n", hidin.usage_ref.usage_code,hidin.usage_ref.value, hidin.usage_ref.usage_index);
+      }
+    }
+    hidin.rep_info.report_id |= HID_REPORT_ID_NEXT;
+  }
+  hidout.rep_info.report_type = HID_REPORT_TYPE_OUTPUT;
+  hidout.rep_info.report_id = HID_REPORT_ID_FIRST;
+  while (ioctl(fd, HIDIOCGREPORTINFO, &hidout.rep_info) >= 0) {
+    dsyslog(LOG_INFO,"OUTPUT Report id: %d (%d fields)\n",hidout.rep_info.report_id,hidout.rep_info.num_fields);
+    for (alv = 0; alv < hidout.rep_info.num_fields; alv++) {
+      memset(&hidout.field_info,0,sizeof(hidout.field_info));
+      hidout.field_info.report_type = hidout.rep_info.report_type;
+      hidout.field_info.report_id = hidout.rep_info.report_id;
+      hidout.field_info.field_index = alv;
+      ioctl(fd, HIDIOCGFIELDINFO, &hidout.field_info);
+      dsyslog(LOG_INFO,"OUTPUT Field: %d: app: %04x phys %04x flags %x (%d usages) unit %x exp %d\n", alv, hidout.field_info.application, hidout.field_info.physical, hidout.field_info.flags, hidout.field_info.maxusage, hidout.field_info.unit, hidout.field_info.unit_exponent);
+      memset(&hidout.usage_ref, 0, sizeof(hidout.usage_ref));
+      for (yalv = 0; yalv < hidout.field_info.maxusage; yalv++) {
+        hidout.usage_ref.report_type = hidout.field_info.report_type;
+        hidout.usage_ref.report_id = hidout.field_info.report_id;
+        hidout.usage_ref.field_index = alv;
+        hidout.usage_ref.usage_index = yalv;
+        ioctl(fd, HIDIOCGUCODE, &hidout.usage_ref);
+        ioctl(fd, HIDIOCGUSAGE, &hidout.usage_ref);
+        dsyslog(LOG_INFO,"OUTPUT Usage: %04x val %d idx %x\n", hidout.usage_ref.usage_code,hidout.usage_ref.value, hidout.usage_ref.usage_index);
+      }
+    }
+    hidout.rep_info.report_id |= HID_REPORT_ID_NEXT;
+  }
+
+  dsyslog(LOG_INFO,"Reports initialized...now starting PowerLinc initialization\n");
+
+  // now write the start request
   memset(start,0,sizeof(start));
   start[0] = X10_PLUSB_XMITCTRL;
   start[1] = X10_PLUSB_TCTRLQUALITY;
@@ -144,6 +297,7 @@ int xmit_init(struct xcvrio *arg)
     syslog(LOG_INFO,"USB Powerlinc initialization failed on setup1 (%s)\n",strerror(errno));
     goto error;
   }
+  start[0] = X10_PLUSB_XMITCTRL;
   start[1] = X10_PLUSB_TCTRLRSTCONT       // make sure continuous is off
            | X10_PLUSB_TCTRLRSTFLAG       // turn off flagging services
            | X10_PLUSB_TCTRLRSTRPT        // turn off reporting mode
@@ -154,22 +308,24 @@ int xmit_init(struct xcvrio *arg)
     syslog(LOG_INFO,"USB Powerlinc initialization failed on setup2 (%s)\n",strerror(errno));
     goto error;
   }
-  usleep(delay*1000);
+  dsyslog(LOG_INFO,"USB PowerLinc stages 1 and 2 complete\n");
+  sleep(2);
+  dsyslog(LOG_INFO,"thanks for the nap...\n");
   start[0] = X10_PLUSB_XMITCTRL;
   start[1] = X10_PLUSB_TCTRLSTATUS;       // request status response
+  start[2] = 0;
   ret = hidwrite(serial,start,sizeof(start));
   if (ret < 0) {
     syslog(LOG_INFO,"USB Powerlinc initialization failed on status request (%s)\n",strerror(errno));
     goto error;
   }
-  ret = hidread(serial,start,sizeof(start),timeout);
-  if (ret < 0) {
+/*  ret = hidread(serial,start,sizeof(start),timeout);
+  if (ret <= 0) {
     syslog(LOG_INFO,"USB Powerlinc initialization failed to return status (%s)\n",strerror(errno));
     goto error;
   }
   syslog(LOG_INFO,"USB Powerlinc Hardware Rev %d.%d found\n",start[3],start[4]);
-  goto error;
-
+*/
 done:
   io->status = 0;
   sem_post(&io->connected);
@@ -182,6 +338,34 @@ error:
   io->status = errno;
   sem_post(&io->connected);
   return 1;
+}
+
+
+// xmit_init is the only function that is required.  It must set the xcvrio.send function
+// to a non-null value immediately
+//
+// return a non-zero number to indicate error
+int xmit_init(struct xcvrio *arg)
+{
+  struct pl_cmd data;
+
+  syslog(LOG_INFO,"Transmit thread starting\n");
+  sem_init(&sem_ack,0,0);
+  io = arg;
+  io->status = 1;
+  io->send = transmit;
+  // Now, connect up and set the status to 0 if successful.  Finally, post to the semaphore to let
+  // the parent know that all is well...then just wait for input from the device...
+  serial = open(io->device,O_RDWR | O_NOCTTY);
+  if (serial < 0) {
+    syslog(LOG_INFO,"Error opening %s (%s)\n",io->device,strerror(errno));
+    return 1;
+  }
+  if (hidinit(serial)){
+    syslog(LOG_INFO,"Error initializing USB device %s\n",io->device);
+    return 1;
+  }
+  return 0;
 }
 
 static unsigned char housecode[] = {
@@ -395,5 +579,6 @@ static void startup()
       syslog(LOG_INFO,"ERROR:  read error (%s)\n",strerror(errno));
       exit (-1);
     }
+//    syslog(LOG_INFO,"Timeout on read\n");
   }
 }
