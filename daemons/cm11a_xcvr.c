@@ -1,6 +1,6 @@
 /*
  *
- * $Id: cm11a_xcvr.c,v 1.3 2004/02/21 02:21:20 whiles Exp whiles $
+ * $Id: cm11a_xcvr.c,v 1.4 2004/06/27 18:17:07 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -184,7 +184,7 @@ int xmit_init(struct xcvrio *arg)
   unsigned char d;
   char buf[32];
   ssize_t res;
-  int ret,i,j;
+  int ret = 0,i = 0,j = 0;
   time_t t;
 
   syslog(LOG_INFO,"Transmit thread starting\n");
@@ -416,7 +416,7 @@ done:
 
 int transmit(int hc, int uc, int cmd)
 {
-  int ret, i;
+  int ret = 0, i = 0;
   char scratch[40];
 
   dsyslog(LOG_INFO,"transmit:  hc=0x%x, uc=0x%x, fc=0x%x\n",hc,uc,cmd);

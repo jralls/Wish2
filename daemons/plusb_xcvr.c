@@ -1,6 +1,6 @@
 /*
  *
- * $Id: plusb_xcvr.c,v 1.6 2004/06/27 18:18:45 whiles Exp whiles $
+ * $Id: plusb_xcvr.c,v 1.7 2004/07/05 01:16:02 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -90,8 +90,8 @@ struct plusb {
 
 int hidwrite(int fd,unsigned char *c,int length)
 {
-  int ret;
-  int i,alv,yalv;
+  int ret = 0;
+  int i = 0,alv = 0,yalv = 0;
   char scratch[80];
 /*
   hidout.rep_info.report_type = HID_REPORT_TYPE_OUTPUT;
@@ -214,7 +214,7 @@ int hidread(int fd,unsigned char *c, int length, int timeout)
 
 __s32 statusrequest() {
   unsigned char start[8];
-  int ret;
+  int ret = 0;
 
   memset(start,0,sizeof(start));
   start[0] = X10_PLUSB_XMITCTRL;
@@ -511,7 +511,7 @@ static int sem_wait_timeout(sem_t *sem,int timeout)
 
 int transmit(int hc, int uc, int cmd)
 {
-  int ret, i;
+  int ret = 0, i = 0;
   struct pl_cmd data;
   char scratch[40];
   __s32 status;

@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.10 2004/06/21 03:49:09 whiles Exp whiles $
+ * $Id: pl_xcvr.c,v 1.11 2004/06/27 18:19:51 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -294,7 +294,7 @@ int startup()
 
 int transmit(int hc, int uc, int cmd)
 {
-  int ret, i;
+  int ret = 0, i = 0;
   unsigned char data[5];
   char scratch[40];
 

@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.14 2004/06/27 18:17:32 whiles Exp $
+ * $Id: main.c,v 1.15 2004/07/05 01:14:47 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -165,7 +165,7 @@ void start()
   FILE *fp;
   register char *p;
   struct sigaction action;
-  int ret,connected = 0,i;
+  int ret = 0,connected = 0,i;
 
   // first open up the syslog
   openlog(logtag,LOG_NDELAY | LOG_PID,syslog_facility);
@@ -399,7 +399,7 @@ static int updatelog(int dir, int hc, int uc, int cmd)
 
 static int updatestatus(int hc, int uc, int cmd, int value)
 {
-  int ret;
+  int ret = 0;
 
   dsyslog(LOG_INFO,"Updating status.....");
   x10_message_t m;
