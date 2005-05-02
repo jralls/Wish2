@@ -1,6 +1,6 @@
 #
 #
-# $Id: Makefile,v 1.3 2004/06/27 18:22:56 whiles Exp whiles $
+# $Id: Makefile,v 1.4 2005/01/24 01:04:26 whiles Exp root $
 #
 #/*
 #   This module is free software; you can redistribute it and/or
@@ -28,16 +28,16 @@ LD=ld
 all: nbread x10watch x10logd nbecho
 
 x10logd: x10logd.c Makefile
-	$(CC) $(INC) $@.c -o $@
+	$(CC) $(INC) $@.c -Wall -o $@
 
 nbread: nbread.c Makefile
-	$(CC) $(INC) $@.c -o $@
+	$(CC) $(INC) $@.c -Wall -o $@
 
 nbecho: nbecho.c Makefile
-	$(CC) $(INC) $@.c -o $@
+	$(CC) $(INC) $@.c -Wall -o $@
 
 x10watch: x10watch.c Makefile
-	$(CC) $(INC) $@.c -o $@
+	$(CC) $(INC) $@.c -Wall -o $@
 
 clean:
 	rm nbread x10watch x10logd nbecho
