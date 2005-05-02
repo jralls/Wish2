@@ -1,6 +1,6 @@
 /*
  *
- * $Id: x10watch.c,v 1.1 2004/01/10 16:34:07 whiles Exp whiles $
+ * $Id: x10watch.c,v 1.2 2004/07/05 01:59:47 whiles Exp root $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -52,7 +52,6 @@ static char *action_off = NULL;
 static char *device_and = NULL;
 static int debug = 0;
 static int interval = 5;		// polling interval
-static int synchronous = 1;
 static int allowroot = 0;
 static int timedelay = 0;
 
@@ -76,7 +75,7 @@ int fd;
 int main(int argc, char *argv[])
 {
 	char *arg;
-	int i,n;
+	int i;
 	uid_t uid;
 
 	progname = basename(argv[0]);
@@ -121,7 +120,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	if (uid == 0 && !allowroot) {
-		fprintf(stderr,"%s:  Unsave to run as root (specify -r to override)!!!!\n");
+		fprintf(stderr,"%s:  Unsave to run as root (specify -r to override)!!!!\n",progname);
 		exit(0);
 	}
 	if (action_on == NULL && action_off == NULL){
@@ -142,6 +141,7 @@ int main(int argc, char *argv[])
 
 	// all done...ready to exit
 	die(0);
+	return 0;
 }
 
 static int watch() 
@@ -198,6 +198,7 @@ static int watch()
 		(WTERMSIG(sysret) == SIGINT || WTERMSIG(sysret) == SIGQUIT))
 			break;
 	}
+	return 0;
 }
 
 // Note!!!  we don't tell the user about the -r option.  They only get that
