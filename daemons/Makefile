@@ -1,6 +1,6 @@
 #
 #
-# $Id: Makefile,v 1.4 2004/02/21 02:23:30 whiles Exp whiles $
+# $Id: Makefile,v 1.5 2005/01/24 01:04:00 whiles Exp root $
 #
 INCLUDE=-I/usr/src/linux/include -I../dev
 CC=gcc
@@ -19,16 +19,16 @@ endif
 all: $(daemons)
 
 cm11ad: main.o cm11a_xcvr.o
-	$(LD) -lpthread -o $@ $+
+	$(LD) -lpthread -Wall -o $@ $+
 
 pld: main.o pl_xcvr.o
-	$(LD) -lpthread -o $@ $+
+	$(LD) -lpthread -Wall -o $@ $+
 
 plusbd: main.o plusb_xcvr.o
-	$(LD) -lpthread -o $@ $+
+	$(LD) -lpthread -Wall -o $@ $+
 
 cm17ad: main.o cm17a_xcvr.o
-	$(LD) -lpthread -o $@ $+
+	$(LD) -lpthread -Wall -o $@ $+
 
 clean:
 	rm -f $(daemons)
