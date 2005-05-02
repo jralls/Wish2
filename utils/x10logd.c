@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: x10logd.c,v 1.1 2004/01/10 16:33:42 whiles Exp whiles $
+ * $Id: x10logd.c,v 1.2 2005/01/24 01:12:13 whiles Exp root $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -140,6 +140,18 @@ int main(int argc, char *argv[])
 	return -1;
 }
 
+void untty() 
+{
+	int i;
+	if (!debug) {
+		i = open("/dev/tty",O_RDWR);
+		if (i >= 0) {
+			ioctl(i,(int)TIOCNOTTY,(char *)0);
+			close(i);
+		}
+	}
+}
+
 void start() 
 {	
 	register int i;
@@ -235,7 +247,7 @@ static char *mon[12]={"Jan","Feb","Mar","Apr","May","Jun",
 static void write_log(int fd,char *buf,int len)
 {
 	register int i;
-	register char *p;
+	register char *p = NULL;
 	char *time = NULL;
 	time_t t;
 	struct tm tm;
@@ -287,31 +299,16 @@ void syntax(int argc, char *argv[],int i)
 	fprintf(stderr,"         -a           - display all in log buffer\n");
 }
 
-untty() 
-{
-	int i;
-	if (!debug) {
-		i = open("/dev/tty",O_RDWR);
-		if (i >= 0) {
-			ioctl(i,(int)TIOCNOTTY,(char *)0);
-			close(i);
-		}
-	}
-}
-
 
 static sighandler_type reapchild()
 {
 	int status;
-	dprintf("%s: reapchild()\n");
+	dprintf("%s: reapchild()\n",progname);
 	while(waitpid(-1,&status,WNOHANG) > 0);
 }
 
 static sighandler_type die(int sig)
 {
-	register struct filed *f;
-	char buf[100];
-
 	if (sig) {
 		mysyslog(LOG_INFO, "exiting on signal %d\n",sig);
 		dprintf("%s(%s): exiting on signal %d\n",progname,logtag,sig);
