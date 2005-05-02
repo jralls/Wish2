@@ -1,6 +1,6 @@
 /*
  *
- * $Id: nbread.c,v 1.1 2004/01/10 16:34:19 whiles Exp whiles $
+ * $Id: nbecho.c,v 1.1 2004/01/17 21:17:29 whiles Exp root $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <strings.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -37,9 +38,8 @@
 
 int main(int argc, char *argv[])
 {
-	unsigned char *inbuf,*outbuf;
 	char line[256];
-	int n,inf,flags,i;
+	int inf,flags,i;
 
 	if (argc < 2) {
 		printf("Syntax:  nbecho <argument>\n");

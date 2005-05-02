@@ -1,6 +1,6 @@
 /*
  *
- * $Id: nbread.c,v 1.2 2002/12/17 15:40:07 whiles Exp $
+ * $Id: nbread.c,v 1.1 2004/01/10 16:34:19 whiles Exp root $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -35,7 +35,6 @@
 
 int main(int argc, char *argv[])
 {
-	unsigned char *inbuf,*outbuf;
 	char line[256];
 	int n,inf;
 
