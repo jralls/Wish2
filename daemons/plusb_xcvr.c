@@ -1,6 +1,6 @@
 /*
  *
- * $Id: plusb_xcvr.c,v 1.9 2005/03/27 04:38:19 root Exp root $
+ * $Id: plusb_xcvr.c,v 1.10 2005/03/27 23:11:19 root Exp $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -380,20 +380,10 @@ int hidinit(int fd)
   if (status < 0)
     goto error;
   syslog(LOG_INFO,"USB Powerlinc Hardware Rev %d.%d found\n",(status>>8)&0xff,status&0xff);
-
 done:
-  io->status = 0;
-  fakereceive = 1;
-  sem_post(&io->connected);
-//  if (DELAY < 1000)
-//    DELAY = 1000;
-  sem_init(&cts,0,1);
-  startup();
   return 0;
 error:
-  io->status = errno;
-  sem_post(&io->connected);
-  return 1;
+  return errno;
 }
 
 
@@ -404,6 +394,7 @@ error:
 int xmit_init(struct xcvrio *arg)
 {
   struct pl_cmd data;
+  int i,error=0;
 
   syslog(LOG_INFO,"Transmit thread starting\n");
   sem_init(&sem_ack,0,0);
@@ -417,11 +408,22 @@ int xmit_init(struct xcvrio *arg)
     syslog(LOG_INFO,"Error opening %s (%s)\n",io->device,strerror(errno));
     return 1;
   }
-  if (hidinit(serial)){
-    syslog(LOG_INFO,"Error initializing USB device %s\n",io->device);
-    return 1;
+  for (i = 0; i < retries; i++) {
+    error = hidinit(serial);
+    delay += 2;
+    if (error == 0){
+      io->status = 0;
+      fakereceive = 1;
+      sem_post(&io->connected);
+      sem_init(&cts,0,1);
+      startup();
+      return 0;
+    }
   }
-  return 0;
+  syslog(LOG_INFO,"Error initializing USB device %s\n",io->device);
+  io->status = errno;
+  sem_post(&io->connected);
+  return error;
 }
 
 static unsigned char housecode[] = {
