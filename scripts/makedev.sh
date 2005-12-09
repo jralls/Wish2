@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: makedev.sh,v 1.7 2004/06/27 18:25:52 whiles Exp root $
+# $Id: makedev.sh,v 1.8 2005/09/18 01:43:20 root Exp root $
 #
 MAJOR_DATA=120
 MAJOR_CONTROL=121
@@ -103,7 +103,7 @@ mknod $DIR/edata c $MAJOR_CONTROL 64
 mknod $DIR/.api c $MAJOR_CONTROL 240
 
 if [ -d /etc/udev/devices ]; then
-  cp -arp $dir /etc/udev/devices/
+  cp -arp $DIR /etc/udev/devices/
   echo "*********************************************************"
   echo "* You appear to be using udev.  A copy of the devices   *"
   echo "* have been placed in /etc/udev/devices so that they    *"
