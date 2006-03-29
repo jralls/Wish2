@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.21 2005/01/24 02:49:38 whiles Exp root $
+ * $Id: dev.c,v 1.22 2005/03/27 04:39:26 root Exp root $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -9,7 +9,7 @@
  *
  */
 
-#define DISTRIBUTION_VERSION "X10 DEV module v2.1.1 (wsh@sprintmail.com)"
+#define DISTRIBUTION_VERSION "X10 DEV module v2.1.3 (wsh@sprintmail.com)"
 
 /* 
    This module is free software; you can redistribute it and/or
@@ -30,6 +30,7 @@
    Should you need to contact the author, you can do so by email to
    <wsh@sprintmail.com>.
 */
+
 
 #define EXPORT_SYMTAB
 #include <linux/config.h>
@@ -52,6 +53,7 @@
 #include <linux/fcntl.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
+#include <linux/proc_fs.h>
 
 #include <linux/version.h>
 
@@ -60,30 +62,54 @@
 #include "strings.h"
 #include "dev.h"
 
+#undef CONFIG_OBSOLETE_MODPARM
+
 #define DATA_DEVICE_NAME "x10d"
 #define CONTROL_DEVICE_NAME "x10c"
 #define API_BUFFER 1024
 
 /* Here are some module parameters and definitions */
 static int debug = 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
 MODULE_PARM (debug, "i");
+#else
+module_param(debug,int,0);
+#endif
 MODULE_PARM_DESC (debug, "turns on debug information (default=0)");
+
 static int nonblockread = 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
 MODULE_PARM(nonblockread,"i");
+#else
+module_param(nonblockread,int,0);
+#endif
 MODULE_PARM_DESC(nonblockread,"If cat is to be used to read the status of units, this needs to be set to 1 so that it will return immediately after read.  Other wise the read blocks until a signal is received or new data is ready");
 
 int syslogtraffic = 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
 MODULE_PARM (syslogtraffic, "i");
+#else
+module_param(syslogtraffic,int,0);
+#endif
 MODULE_PARM_DESC (syslogtraffic, "If set to 1, all X10 traffic is written to kern.notice in the syslog (default=0)");
 
 static int data_major = 120;
-static int control_major = 121;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
 MODULE_PARM(data_major, "i");
+#else
+module_param(data_major,int,0);
+#endif
 MODULE_PARM_DESC(data_major, "Major character device for communicating with individual x10 units (default=120)");
+
+static int control_major = 121;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
 MODULE_PARM(control_major, "i");
+#else
+module_param(control_major,int,0);
+#endif
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.21 2005/01/24 02:49:38 whiles Exp root $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.22 2005/03/27 04:39:26 root Exp root $"
 char *version = DRIVER_VERSION;
 static int delay=1;
 
@@ -506,10 +532,35 @@ static int log_get(loff_t *offset,unsigned char *ubuffer,int len)
    of zero to have the system allocate major device numbers.  If this is done, 
    the user must look in /proc/devices to find the device numbers.
 */
+char *procdirname="bus/x10";
+char *procinfoname="info";
+static struct proc_dir_entry *procdir,*procinfo;
+
+static int proc_read_info(char *page,char **start,off_t off,int counter,int *eof, void *data)
+{
+  int len;
+//  MOD_INC_USE_COUNT;
+  len = sprintf(page,"%s\nUserspace Status:  %s\n",DISTRIBUTION_VERSION,x10api.us_connected != 0 ? "connected" : "not connected");
+//  MOD_DEC_USE_COUNT;
+  return len;
+}
+
 int __init
 x10_init (void)
 {
-  int res;
+  int res,returnvalue = 0;
+
+  procdir=proc_mkdir(procdirname,NULL);
+  if (procdir == NULL) {
+    returnvalue = -ENOMEM;
+    goto error_dir;
+  }
+  procinfo=create_proc_read_entry(procinfoname,S_IRUSR|S_IRGRP|S_IROTH,procdir,proc_read_info,NULL);
+  if (procinfo == NULL) {
+    returnvalue = -ENOMEM;
+    goto error_info;
+  }
+  procinfo->owner = THIS_MODULE;
 
   memset(&x10api,0,sizeof(x10api_t));
   x10api.data = -1;
@@ -554,6 +605,10 @@ x10_init (void)
   dbg ("%s", "X10 /dev devices registered");
   info ("X10 driver successfully loaded");
   return 0;
+error_info:
+  remove_proc_entry(procdirname,NULL);
+error_dir:
+  return returnvalue;
 }
 
 void __exit
@@ -571,6 +626,8 @@ x10_exit (void)
     if (unregister_chrdev (x10api.control, CONTROL_DEVICE_NAME) == -EINVAL)
       dbg ("error unregistering %s", CONTROL_DEVICE_NAME);
     }
+  remove_proc_entry(procinfoname,procdir);
+  remove_proc_entry(procdirname,NULL);
   info ("X10 driver unloaded");
 }
 
