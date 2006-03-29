@@ -1,0 +1,8 @@
+/var/log/x10log {
+    rotate 10
+    size=200k
+    sharedscripts
+    postrotate
+	/sbin/killall -HUP x10logd
+    endscript
+}
