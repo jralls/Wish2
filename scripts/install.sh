@@ -30,6 +30,9 @@ cp -f utils/nbecho /usr/bin/
 #echo "cp -f dev/x10.o $moduledir"
 #cp -f dev/x10.o $moduledir/x10.ko
 #cp -f dev/x10.o $moduledir/x10.o
+if [ ! -f /etc/logrotate.d/x10 ]; then
+  cp scripts/logrotate.d/x10 /etc/logrotate.d/x10
+fi
 
 if [ -d /etc/rc.d/init.d ]; then
 	if [ -f /etc/rc.d/init.d/x10.cm11a ]; then
