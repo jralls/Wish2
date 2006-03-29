@@ -32,7 +32,21 @@ cp -f utils/nbecho /usr/bin/
 #cp -f dev/x10.o $moduledir/x10.o
 
 if [ -d /etc/rc.d/init.d ]; then
+	if [ -f /etc/rc.d/init.d/x10.cm11a ]; then
+	echo "/etc/rc.d/init.d/x10.cm11a exists...not replacing"
+	else
 	cp -f example_scripts/x10.cm11a.sh /etc/rc.d/init.d/x10.cm11a
+	fi
+
+	if [ -f /etc/rc.d/init.d/x10.pl ]; then
+	echo "/etc/rc.d/init.d/x10.pl exists...not replacing"
+	else
 	cp -f example_scripts/x10.pl.sh /etc/rc.d/init.d/x10.pl
+	fi
+
+	if [ -f /etc/rc.d/init.d/x10.plusb ]; then
+	echo "/etc/rc.d/init.d/x10.plusb exists...not replacing"
+	else
 	cp -f example_scripts/x10.plusb.sh /etc/rc.d/init.d/x10.plusb
+	fi
 fi
