@@ -3,7 +3,7 @@
 
 /*
  *
- * $Id: dev.h,v 1.6 2004/01/04 19:36:45 whiles Exp whiles $
+ * $Id: dev.h,v 1.7 2004/01/16 16:33:44 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -32,7 +32,7 @@
 
 #define DEBUG
 
-#include <linux/devfs_fs_kernel.h>
+// #include <linux/devfs_fs_kernel.h>
 
 // define a standard format for messages to syslogd
 #ifdef DEBUG
