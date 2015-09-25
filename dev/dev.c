@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.23 2006/03/29 02:33:23 root Exp root $
+ * $Id: dev.c,v 1.23 2006/03/29 02:33:23 root Exp john $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -33,7 +33,7 @@
 
 
 #define EXPORT_SYMTAB
-// #include <linux/config.h>
+//#include <linux/config.h>
 
 #ifdef CONFIG_SMP
 #define __SMP__
@@ -48,6 +48,7 @@
 #include <linux/delay.h>
 #include <linux/file.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
 #include <linux/tty.h>
 #include <linux/time.h>
 #include <linux/fcntl.h>
@@ -109,7 +110,7 @@ module_param(control_major,int,0);
 #endif
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.23 2006/03/29 02:33:23 root Exp root $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.23 2006/03/29 02:33:23 root Exp john $"
 char *version = DRIVER_VERSION;
 static int delay=1;
 
@@ -532,18 +533,31 @@ static int log_get(loff_t *offset,unsigned char *ubuffer,int len)
    of zero to have the system allocate major device numbers.  If this is done, 
    the user must look in /proc/devices to find the device numbers.
 */
-char *procdirname="bus/x10";
-char *procinfoname="info";
-static struct proc_dir_entry *procdir,*procinfo;
-
-static int proc_read_info(char *page,char **start,off_t off,int counter,int *eof, void *data)
+char *procdirname = "bus/x10";
+const char *procinfoname = "info";
+static struct proc_dir_entry *procdir, *procinfo;
+#ifndef CREATE_PROC
+static int proc_read_info(char *page, char **start, off_t off, int counter,
+                          int *eof, void *data)
+#else
+static int proc_read_info(struct file *filp, char *page, size_t counter,
+                          loff_t *offp)
+#endif
 {
   int len;
 //  MOD_INC_USE_COUNT;
-  len = sprintf(page,"%s\nUserspace Status:  %s\n",DISTRIBUTION_VERSION,x10api.us_connected != 0 ? "connected" : "not connected");
+  len = sprintf(page, "%s\nUserspace Status:  %s\n",
+                DISTRIBUTION_VERSION,
+                x10api.us_connected != 0 ? "connected" : "not connected");
 //  MOD_DEC_USE_COUNT;
   return len;
 }
+
+#ifdef CREATE_PROC
+const struct file_operations proc_fops = {
+.read = proc_read_info
+};
+#endif
 
 int __init
 x10_init (void)
@@ -555,12 +569,17 @@ x10_init (void)
     returnvalue = -ENOMEM;
     goto error_dir;
   }
-  procinfo=create_proc_read_entry(procinfoname,S_IRUSR|S_IRGRP|S_IROTH,procdir,proc_read_info,NULL);
+#ifndef CREATE_PROC
+  procinfo = create_proc_read_entry(procinfoname, S_IRUSR|S_IRGRP|S_IROTH,
+                                    procdir, proc_read_info, NULL);
+#else
+  procinfo = proc_create(procinfoname, S_IRUSR|S_IRGRP|S_IROTH,
+                         procdir, &proc_fops);
+#endif
   if (procinfo == NULL) {
     returnvalue = -ENOMEM;
     goto error_info;
   }
-  procinfo->owner = THIS_MODULE;
 
   memset(&x10api,0,sizeof(x10api_t));
   x10api.data = -1;
@@ -579,10 +598,12 @@ x10_init (void)
 
   // the private data for each device identifies the minor device info
 
-  dbg ("registering data_major device %d for %s",x10api.data_major,DATA_DEVICE_NAME);
+  dbg ("registering data_major device %d for %s",
+       x10api.data_major, DATA_DEVICE_NAME);
   res = register_chrdev (x10api.data_major, DATA_DEVICE_NAME, &device_fops);
   if (res < 0) {
-    err ("unable to register major device %d for %s", x10api.data_major, DATA_DEVICE_NAME);
+    err ("unable to register major device %d for %s", x10api.data_major,
+		 DATA_DEVICE_NAME);
     x10_exit ();
     return x10api.data;
   }
@@ -618,13 +639,15 @@ x10_exit (void)
 
   if (x10api.data >= 0) {
     dbg ("unregistering %d:%s", x10api.data, DATA_DEVICE_NAME);
-    if (unregister_chrdev (x10api.data, DATA_DEVICE_NAME) == -EINVAL)
-      dbg ("error unregistering %s", DATA_DEVICE_NAME);
+    unregister_chrdev (x10api.data, DATA_DEVICE_NAME);
+    //if (unregister_chrdev (x10api.data, DATA_DEVICE_NAME) == -EINVAL)
+    //  dbg ("error unregistering %s", DATA_DEVICE_NAME);
   }
   if (x10api.control >= 0) {
     dbg ("unregistering %d:%s", x10api.control, CONTROL_DEVICE_NAME);
-    if (unregister_chrdev (x10api.control, CONTROL_DEVICE_NAME) == -EINVAL)
-      dbg ("error unregistering %s", CONTROL_DEVICE_NAME);
+    unregister_chrdev (x10api.control, CONTROL_DEVICE_NAME);
+    //if (unregister_chrdev (x10api.control, CONTROL_DEVICE_NAME) == -EINVAL)
+    //  dbg ("error unregistering %s", CONTROL_DEVICE_NAME);
     }
   remove_proc_entry(procinfoname,procdir);
   remove_proc_entry(procdirname,NULL);
