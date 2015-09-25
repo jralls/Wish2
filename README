@@ -1,0 +1,4 @@
+This is a fork of the Wish2 X10 driver module from http://sourceforge.net/projects/wish/.
+For more information see http://wish.sourceforge.net/.
+
+This repo contains an update to enable Wish to work on kernel versions 3.10 up to at least 3.16.
