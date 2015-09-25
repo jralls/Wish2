@@ -1,5 +1,5 @@
 #!/bin/sh
 #
-cp -f `uname -r | cut -c 1-3`/Makefile .
+cp -f `uname -r | cut -d '.' -f 1,2`/Makefile .
 make $*
 rm -f Makefile
