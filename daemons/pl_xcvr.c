@@ -1,6 +1,6 @@
 /*
  *
- * $Id: pl_xcvr.c,v 1.12 2004/10/21 01:30:59 whiles Exp $
+ * $Id: pl_xcvr.c,v 1.12 2004/10/21 01:30:59 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -240,8 +240,11 @@ static int updateack(int value)
   dsyslog(LOG_INFO,"updateack:  %d\n",value);
   ack = value;
   sem_getvalue(&sem_ack,&data);
-  if (data == 0)
+  if (data == 0){
     sem_post(&sem_ack);
+    return 0;
+  }
+  return 1;
 }
 
 static int clearack()

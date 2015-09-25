@@ -16,6 +16,9 @@
 #	echo "mkdir $moduledir"
 #	mkdir -p $moduledir
 #fi
+echo "cp -f scripts/makedev.sh /usr/sbin/x10makedev.sh"
+cp -f scripts/makedev.sh /usr/sbin/x10makedev.sh
+/usr/sbin/x10makedev.sh
 
 echo "cp -f daemons/*d /usr/sbin/"
 cp -f daemons/*d /usr/sbin/

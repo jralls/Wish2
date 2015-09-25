@@ -1,0 +1,2 @@
+# udev rules file for x10dev
+KERNEL=="x10/*",	NAME="%k", MODE="0666", RUN+="makex10dev.sh"

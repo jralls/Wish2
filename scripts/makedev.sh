@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: makedev.sh,v 1.9 2005/12/09 14:04:02 root Exp $
+# $Id: makedev.sh,v 1.9 2005/12/09 14:04:02 root Exp root $
 #
 MAJOR_DATA=120
 MAJOR_CONTROL=121
@@ -102,11 +102,20 @@ mknod $DIR/edata c $MAJOR_CONTROL 64
 
 mknod $DIR/.api c $MAJOR_CONTROL 240
 
+#if [ -d /etc/udev/rules.d ]; then
+#  cp -f scripts/99-x10.rules /etc/udev/rules.d/
 if [ -d /etc/udev/devices ]; then
   cp -arp $DIR /etc/udev/devices/
-  echo "*********************************************************"
-  echo "* You appear to be using udev.  A copy of the devices   *"
-  echo "* have been placed in /etc/udev/devices so that they    *"
-  echo "* automatically be created whenever the machine starts. *"
-  echo "*********************************************************"
+elif [ -d /lib/udev/devices ]; then
+  # Thanks to Ed Santiago for identifying the alternate directory for
+  # Gentoo installations
+  cp -arp $DIR /lib/udev/devices/
+else
+  echo "**********************************************************************"
+  echo "The X10dev installation cannot figure out how to automatically create"
+  echo "your device files.  This installation will create them manually.  If"
+  echo "the devices do not exist when you reboot your system, you will need"
+  echo "to manually run $0 every time you reboot your"
+  echo "system."
+  echo "**********************************************************************"
 fi

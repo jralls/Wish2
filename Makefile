@@ -30,9 +30,10 @@ clean:
 
 install:
 	sh ./scripts/install.sh $(KERNELDIR)
-ifneq (/dev/x10,$(wildcard /dev/x10))
-	sh ./scripts/makedev.sh
-endif
 	(cd dev; ./make.sh install)
 	depmod
+
+#ifneq (/dev/x10,$(wildcard /dev/x10))
+#	sh ./scripts/makedev.sh
+#endif
 

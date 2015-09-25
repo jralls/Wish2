@@ -69,8 +69,7 @@ in this release are:</p>
   </li>
 </ul>
 <ul>
-  <li>Usage <a href="unidev.html"><font color="#FF0000">(click here for the
-    documentation on the Unified Device Driver interface)</font></a>
+  <li>Usage
     <ul>
       <li><a href="#UserspaceUsage">User Space commands</a></li>
       <li><a href="#Exampleusage">Example Usage</a></li>
@@ -108,7 +107,13 @@ in this release are:</p>
 explain more of how this project came about and why certain choices were made.&nbsp;</p>
 
 <ol>
-  <li><b>Q:&nbsp; Why do I have to compile the kernel and boot from it before 
+  <li><b>Q:&nbsp; Since SmartHome has discontinued the PowerLinc version 1 transceivers and is no longer selling them, when will you have drivers for the PowerLinc v2 transceivers?
+  <br>
+  A:&nbsp; </b>This has to be my most frequently asked question.  When I hacked the protocol for the SmartHome PowerLinc version 1 transceivers, it seemed to surprise SmartHome and the licensing information for the transceiver did not prevent me from reverse engineering the protocol.  But, when SmartHome released the version 2 hardware, they included a licensing agreement that stipulates that the transceivers cannot be reverse engineered. SmartHome has a SDK for sale that would make development of the drivers very easy, but the SDK also contains a licensing agreement that prevents release of any derivitives in source form. While I completely disagree with what SmartHome has done, I can understand why they would do it and since I neither want to get involved in any legal battle nor have the financial means to defend myself legally, I have chosen to not pursue the SmartHome PowerLinc v2 at all. Note, I have contacted SmartHome on numerous occasions requesting permission to develop the open-source drivers, but they have not responded. I am very much aware of Nick Cherry's work, but I am not about to make a derivitive work from Nick's work that would expose me to the legal problems with SmartHome.  Most users note that the drivers seem to get signals and negotiate with the PowerLinc v2 transceivers and indeed the protocol appears to be very similar to the v1 hardware. I believe it would be simply a matter of updating the translation table with the new binary codes and thus adapting the drivers to the v2 hardware should be very simple. <br>
+  <br>My only recommendation here is that users either hammer SmartHome to allow me to develop the drivers or use an alternative transceiver. </li>
+  <li><b>Q:&nbsp; I am using Ubuntu (or some other linux distribution) and the /dev/x10 devices are not deleted when the system restarts?<br>
+	A:&nbsp; </b>Some of the distributions do not come delivered with /etc/udev/devices. When the installation script runs, it checks for the existance of this directory and if it does exist, it will create the devices in /etc/udev/devices/x10 which causes the Linux UDEV system to automatically create the devices when the system boots. A solution that seems to work is to create /etc/udev/devices before installing the x10dev drivers as Ubuntu will use this area to create the devices. Another option that I have seen work is to do the installation, and then copy the directory /dev/x10 to /lib/udev/devices (cp -arp /dev/x10 /lib/udev/devices). </li>
+	<li><b>Q:&nbsp; Why do I have to compile the kernel and boot from it before 
 	installing the wish drivers?<br>
 	A:&nbsp; </b>As of version 2.1.0, you no longer have to compile your kernel 
 	in order to install and use the drivers thanks to some help from <b>Michael 
@@ -599,7 +604,7 @@ load the device module and then load the userspace programs per the table below.
 						<td>modprobe x10</td>
 					</tr>
 					<tr>
-						<td>/usr/sbin/pl -device /dev/ttyS0</td>
+						<td>/usr/sbin/pld -device /dev/ttyS0</td>
 					</tr>
 					<tr>
 						<td>/usr/sbin/x10logd</td>
@@ -617,7 +622,7 @@ load the device module and then load the userspace programs per the table below.
 						<td>modprobe x10</td>
 					</tr>
 					<tr>
-						<td>/usr/sbin/plusb -device /dev/usb/hiddev0</td>
+						<td>/usr/sbin/plusbd -device /dev/usb/hiddev0</td>
 					</tr>
 					<tr>
 						<td>/usr/sbin/x10logd</td>

@@ -1,6 +1,6 @@
 /*
  *
- * $Id: cm11a_xcvr.c,v 1.6 2005/01/24 01:13:05 whiles Exp $
+ * $Id: cm11a_xcvr.c,v 1.6 2005/01/24 01:13:05 whiles Exp whiles $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -328,8 +328,14 @@ static int updateack(int value)
   dsyslog(LOG_INFO,"updateack:  %d\n",value);
   ack = value;
   sem_getvalue(&sem_ack,&data);
-  if (data == 0)
+  if (data == 0){
     sem_post(&sem_ack);
+    return 0;  	/* I think this should be a 1, but I cannot */
+		/* remember the condition in which we need to */
+		/* hold the receiver queue...returning 1 will */
+		/* cause the receiving queue to skip the data loop */
+  }
+  return 0;
 }
 
 static int clearack()
@@ -341,6 +347,7 @@ static int clearack()
     data = sem_trywait(&sem_ack);
   } while (data == 0);
   ack = 0;
+  return 0;
 }
 
 static int sem_wait_timeout(sem_t *sem,int timeout)
@@ -502,21 +509,21 @@ static void start()
         continue;
       if (c == CM11A_POLL) {
         dsyslog(LOG_INFO,"CM11A_POLL");
-          index = 0;
-          a = CM11A_POLLACK;
-          ret = write(serial, &a, 1);      // acknowledge the poll so that data starts
-          dsyslog(LOG_INFO,"sent CM11A_POLLACK");
-       } else if (c == CM11A_MACROPOLL) {      // macro report coming in
-         dsyslog(LOG_INFO,"MACRO_POLL");
-         receivemacro = 1;
-         index = 0;
-       } else if (c == CM11A_POWERFAILPOLL) {  // power fail, macro download poll
-         dsyslog(LOG_INFO,"POWERFAIL_POLL");
-         index = 0;
-         a = CM11A_POWERFAILPOLLACK;
-         ret = write(serial,&a,1);       // acknowledge the poll
-         dsyslog(LOG_INFO,"sent CM11A_POWERFAILPOLLACK");
-       }
+        index = 0;
+        a = CM11A_POLLACK;
+        ret = write(serial, &a, 1);      // acknowledge the poll so that data starts
+        dsyslog(LOG_INFO,"sent CM11A_POLLACK");
+      } else if (c == CM11A_MACROPOLL) {      // macro report coming in
+        dsyslog(LOG_INFO,"MACRO_POLL");
+        receivemacro = 1;
+        index = 0;
+      } else if (c == CM11A_POWERFAILPOLL) {  // power fail, macro download poll
+        dsyslog(LOG_INFO,"POWERFAIL_POLL");
+        index = 0;
+        a = CM11A_POWERFAILPOLLACK;
+        ret = write(serial,&a,1);       // acknowledge the poll
+        dsyslog(LOG_INFO,"sent CM11A_POWERFAILPOLLACK");
+      }
 
        buf[index++] = c;   //go ahead and store the poll character
 
