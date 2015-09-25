@@ -1,0 +1,4 @@
+# sleep time.  Turn off interior lights, and all exterior lights except
+# lights on main entrances at 10:30 each night
+# minute hour dayofmonth month dayofweek command
+30 22 * * * /usr/local/etc/x10/action_sleep.sh

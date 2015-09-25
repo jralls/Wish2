@@ -3,7 +3,7 @@
 
 /*
  *
- * $Id: dev.h,v 1.7 2004/01/16 16:33:44 whiles Exp whiles $
+ * $Id: dev.h,v 1.8 2006/10/21 01:41:47 whiles Exp $
  *
  * Copyright (c) 2002 Scott Hiles
  *

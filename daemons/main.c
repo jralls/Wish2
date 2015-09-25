@@ -1,6 +1,6 @@
 /*
  *
- * $Id: main.c,v 1.17 2005/03/27 04:37:47 root Exp root $
+ * $Id: main.c,v 1.18 2005/03/27 23:11:01 root Exp $
  *
  * Copyright (c) 2002 Scott Hiles
  *

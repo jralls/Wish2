@@ -1,6 +1,6 @@
 /*
  *
- * $Id: cm11a_xcvr.c,v 1.5 2004/10/21 01:29:46 whiles Exp whiles $
+ * $Id: cm11a_xcvr.c,v 1.6 2005/01/24 01:13:05 whiles Exp $
  *
  * Copyright (c) 2002 Scott Hiles
  *

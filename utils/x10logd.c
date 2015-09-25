@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: x10logd.c,v 1.2 2005/01/24 01:12:13 whiles Exp root $
+ * $Id: x10logd.c,v 1.3 2005/05/02 00:26:38 root Exp $
  *
  * Copyright (c) 2002 Scott Hiles
  *

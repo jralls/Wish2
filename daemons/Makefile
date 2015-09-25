@@ -1,6 +1,6 @@
 #
 #
-# $Id: Makefile,v 1.5 2005/01/24 01:04:00 whiles Exp root $
+# $Id: Makefile,v 1.6 2005/05/02 00:24:57 root Exp $
 #
 INCLUDE=-I/usr/src/linux/include -I../dev
 CC=gcc

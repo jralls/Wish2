@@ -1,7 +1,7 @@
 
 /* 
  *
- * $Id: x10_strings.h,v 1.2 2003/01/20 00:01:41 whiles Exp $
+ * $Id: strings.h,v 1.1 2004/01/03 20:41:18 whiles Exp $
  *
  * Copyright (c) 2002 Scott Hiles
  * 

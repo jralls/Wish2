@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: makedev.sh,v 1.8 2005/09/18 01:43:20 root Exp root $
+# $Id: makedev.sh,v 1.9 2005/12/09 14:04:02 root Exp $
 #
 MAJOR_DATA=120
 MAJOR_CONTROL=121

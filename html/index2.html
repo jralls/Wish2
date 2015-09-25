@@ -1,0 +1,2226 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>Project WiSH</title>
+<style fprolloverstyle>A:hover {color: red; font-weight: bold}
+</style>
+</head>
+
+<body style="background-attachment: fixed">
+<p align="center">
+<A href="http://sourceforge.net"> <IMG src="http://sourceforge.net/sflogo.php?group_id=68802&amp;type=5" border="0" alt="SourceForge Logo"></A>
+
+<h1 align="center"><b>Linux X10 universal device driver</b></h1>
+<h2 align="center"><b>(aka Project WiSH)</b></h2>
+<p align="center">x10dev Version 2.1.1</p>
+<hr>
+<h1 align="center"><a name="Introduction">Introduction</a></h1>
+<p>This is the second generation version of the X10 drivers for Linux.&nbsp; 
+From the user perspective, the new revision behaves exactly as the previous 
+version did with the exception that a number of features are added.&nbsp; 
+Test this code only if you are willing to tolerate bugs and report them.&nbsp; 
+The original 1.x version is still available at
+<a href="http://wish.sourceforge.net/index1.html">
+http://wish.sourceforge.net/index1.html</a>.</p>
+<p>Included 
+in this release are:</p>
+<ul>
+	<li>Full /dev/x10 capability with enhancements for non-blocking writes</li>
+	<li>Full support for PowerLinc Serial transceiver</li>
+	<li>Full support for CM11A Serial transceiver</li>
+	<li>Full support for PowerLinc USB transceiver (with kernel patches for USB)</li>
+</ul>
+<p>What has changed:</p>
+<ul>
+	<li>X10 state machine simulator runs in userspace</li>
+	<li>Kernel module maintains status of individual devices and implements API 
+	only</li>
+	<li>non-blocking writes (by popular demand) so commands can be queued up in 
+	rapid succession</li>
+	<li>PowerLinc USB now uses HID interface</li>
+	<li>Version 2.0 drivers work with kernel 2.6.7 and higher and with kernel 
+	version 2.4.0 (the PowerLinc USB will not work with kernel 2.4 due to lack 
+	of support for multibyte messages in the USB subsystem of the kernel.&nbsp; 
+	If you require the PowerLinc USB and kernel 2.4, use <a href="index1.html">
+	wish-1.6.10</a>.&nbsp; )</li>
+	<li>Simpler compilation and installation method</li>
+</ul>
+<hr>
+<h1 align="center">Index</h1>
+<ul>
+  <li><a href="#Introduction">Introduction</a> (why bother)</li>
+  <li><a href="#compatibility">Linux hardware/version compatibility</a></li>
+  <li><a href="http://sourceforge.net/projects/wish">Downloading</a> <font color="#FF0000">(Click
+    this link to go to the sourceforge.net repository to download the driver)</font></li>
+  <li><a href="#FAQ">FAQ</a></li>
+  <li>Installation
+    <ul>
+      <li><a href="#Installation">Installation (from source)</a>
+    <ul>
+      <li><a href="#compiling">Compiling the driver</a></li>
+      <li><a href="#Createthedevices">Create the Devices</a></li>
+    </ul>
+      </li>
+      <li><a href="#Loadthemodules">Loading the Drivers</a></li>
+      <li><a href="#filelocations">File Locations</a></li>
+		<li><a href="#stopping">Unloading/Stopping the drivers</a></li>
+    </ul>
+  </li>
+</ul>
+<ul>
+  <li>Usage <a href="unidev.html"><font color="#FF0000">(click here for the
+    documentation on the Unified Device Driver interface)</font></a>
+    <ul>
+      <li><a href="#UserspaceUsage">User Space commands</a></li>
+      <li><a href="#Exampleusage">Example Usage</a></li>
+      <li><a href="#ScriptExamples">Script examples</a></li>
+      <li><a href="#programming">Control from a program</a>  (ioctl calls)</li>
+      <li><a href="#ExtendedData">Sending/receiving extended data (analog)</a></li>
+      <li><a href="#logs">Log and Status output</a></li>
+      <li><a href="#utilities">Utilities</a>
+        <ul>
+          <li><a href="#x10logd">x10logd</a></li>
+          <li>Non-Blocking Read Utility (<a href="#nbread">nbread</a>)</li>
+			<li>Non-Blocking Echo Utility (<a href="#nbecho">nbecho</a>)</li>
+          <li><a href="#x10watch">x10watch</a></li>
+        </ul>
+      </li>
+      <li><a href="x10web.html">Java based GUI</a>s
+        <ul>
+          <li><a href="x10web.html#x10web">x10web</a></li>
+          <li><a href="x10web.html#x10home">x10home</a></li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+  <li><a href="#TechnicalDetails">Technical Details</a></li>
+  <li><a href="#Limitations">Limitations</a></li>
+  <li><a href="#Download">Revision Log</a></li>
+  <li><a href="#todo">To Do List</a></li>
+  <li><a href="#Author">Contacting the author</a></li>
+  <li><a href="#Evolution">Tale of Evolution</a></li>
+  <li><a href="#Reference">References</a></li>
+</ul>
+<hr>
+<h2 align="center"><b><a name="FAQ">FAQ</a></b></h2>
+<p>Beyond the basic introduction to the project, this section is intended to 
+explain more of how this project came about and why certain choices were made.&nbsp;</p>
+
+<ol>
+  <li><b>Q:&nbsp; Why do I have to compile the kernel and boot from it before 
+	installing the wish drivers?<br>
+	A:&nbsp; </b>As of version 2.1.0, you no longer have to compile your kernel 
+	in order to install and use the drivers thanks to some help from <b>Michael 
+	H. Warfield</b>.</li>
+	<li>Q:&nbsp; <b>Why is the USB daemon not compiled when the drivers are 
+	built on a 2.4 system?</b><br>
+	A:&nbsp; Kernel 2.4 does not support bi-directional multi-byte USB 
+	communications.&nbsp; As a result the drivers cannot communicate with the 
+	USB X10 controllers.</li>
+	<li><b>Q:&nbsp; Can't you make the PowerLinc USB work with wish-2.0 and 
+	kernel 2.4?<br>
+	A: </b>&nbsp;No.&nbsp; Prior to kernel 2.6.7, the USB subsystem of the 
+	kernel could only handle single byte transactions that are typical of 
+	keyboards and mice.&nbsp; The PowerLinc USB device requires that an 8 byte 
+	message be sent and received for every transaction.&nbsp; Therefore kernels 
+	prior to 2.6.7 cannot support the PowerLinc USB.&nbsp; Note that there is a 
+	patch for kernel 2.6.1 through 2.6.6 (included in the wish-2.0 distribution) 
+	and the patch was incorporated into 2.6.7.</li>
+	<li><b>Q:&nbsp; Why the architecture change?<br>A:&nbsp; </b>The largest reason is to gain stability and simplicity in the 
+	drivers.&nbsp; Every version of the kernel resulted in significant changes 
+	to the USB core which caused lots of &quot;#ifdef&quot; blocks of code and constantly 
+	chasing the kernel to make the USB drivers work when a new revision came 
+	out.&nbsp; Also, RedHat has a habit of taking the standard kernel and 
+	modifying it to add enhancements which further complicated the drivers.&nbsp; 
+	Version 2.6 of the kernel changed portions of the serial interface causing a 
+	rewrite of the serial code as well as the USB code. <br><br>So, rather than continuing to chase the changes in the kernel, I extracted 
+	those things that have been stable across the kernels and put them into the 
+	kernel module.&nbsp; The rest is in the userspace portion of the driver in 
+	the form of a daemon.&nbsp; The userspace handles communications with the 
+	transceiver and simulates the X10 network in order to update the state of 
+	each device in the kernel module.&nbsp; A big side effect of moving the 
+	state simulator to userspace, if the userspace program crashes or the 
+	transceiver is changed, the state of the network devices is still 
+	maintained.&nbsp; </li>
+	<li><b>Q:&nbsp; What happened to the CM17A driver?<br>
+	A:&nbsp; </b>The CM17A requires direct access to the hardware of the machine 
+	so the driver for the CM17A requires low level drivers in the kernel.&nbsp; 
+	The architecture for Version 2.0 relies on using standard USB and Serial 
+	device drivers to make the X10 transceivers work on all hardware that is 
+	supported with the Linux Kernel.&nbsp; After Version 2.0 is in use for a 
+	wide audience, and if there is sufficient demand for it, I will work on a 
+	device driver for the kernel that makes the CM17A look like a serial port.&nbsp; </li>
+	<li><b>Q:&nbsp; What are non-blocking writes?<br>A:&nbsp; </b>A number of people complained that the system was slow and that they wanted 
+	to send commands without having to wait for the system to complete each 
+	command.&nbsp; If you issue commands in blocking mode (typically with the 
+	echo command) the driver behaves the same as before.&nbsp; But, if you issue 
+	the command in non-blocking mode, the driver will queue the command up and 
+	let it execute serially.&nbsp; To facilitate this a new utility called &quot;nbecho&quot; 
+	has been provided in the distribution.&nbsp; Also, I learned a few lessons 
+	in the development of the 1.x series and figured out how to do handshaking 
+	with the transcievers more efficiently.&nbsp; The CM11A has a notable 
+	speedup due to these changes.</li>
+	<li><b>Q:&nbsp; What happened to the unidev interface?</b><br><b>A</b>:&nbsp; I have focused on the more popular interface first.&nbsp; Unidev 
+	will be moved over later.</li>
+	<li><b>Q:&nbsp; How to I know when new drivers have been released?<br>A</b>:&nbsp; The drivers are all on
+	<a href="http://sourceforge.net/projects/wish">sourceforge.net/projects/wish</a>.&nbsp;
+    Sourceforge has a couple of facilities that are used to notify users of the
+    driver updates.&nbsp;&nbsp;<br><br>The first is the &quot;<b>Monitor</b>&quot; feature.&nbsp; If you look at
+    the primary page, for each download group there is a little picture of a
+    mail envelope.&nbsp; If you click on this you can set yourself up to get
+    notifications whenever new files are placed on the site.&nbsp; When you
+    &quot;Monitor&quot; the drivers you will get a notification that a version
+    was released but no details on what the release does.<br><br>The second method is through the mailing list. If you scroll down to the
+    bottom of the primary page you will find an item that says &quot;<b>Mailing
+    Lists</b>&quot;.&nbsp; Clicking on this link will allow you to subscribe to
+    the list.&nbsp; Whenever a new version of the driver is put on sourceforge,
+    a detailed message of the changes is sent to the mailing list.&nbsp; This
+    allows you to decide if you really need to update or not.&nbsp; For
+    instance, if the changes were all related to the USB driver and you are
+    using the CM11A, you do not need to update your drivers.</li>
+	<li><b>Q:&nbsp; Why did you remove support for DEVFS?<br>A:&nbsp; </b>Version 2.6 of the kernel removes DEVFS support.&nbsp; Some 
+	minor DEVFS capability is still there, but for the most part it has been 
+	rendered unusable in 2.6.</li>
+	<li><b>Q:&nbsp; Sometimes my transceiver works, and sometimes it doesn't.</b>&nbsp;
+	<br>
+	<b>A:&nbsp; </b>This is a difficult one to solve.&nbsp; Some transceivers 
+	such as the CM11A do not reliably handshake without a small delay.&nbsp; 
+	This has also been experienced by users with some USB PCI cards.&nbsp; If 
+	your transceiver occasionally will not start, try setting the delay option 
+	in small increments.&nbsp; For example, for the PowerLinc on a generic USB 
+	PCI card, I have to use a value of 4.</li>
+	<li><b>Q: Aren't there already drivers for transceivers?</b>&nbsp;&nbsp;<br>
+	<b>A: </b>Yes, and no.&nbsp; There are drivers for older transceivers like the 
+	<a href="http://www.smarthome.com/1140.html">CM11A</a>
+(<a href="http://www.heyu.org">heyu</a>) and even the newer 
+	<a href="http://www.x10.com/products/firecracker_x10_cm17a_br1ab.htm">FireCracker/CM17A</a>
+which have well documented programming manuals.&nbsp; But, there are no Linux
+drivers for the <a href="http://www.smarthome.com/1132.html">PowerLinc Serial</a>
+or the <a href="http://www.smarthome.com/1132u.html">PowerLinc USB</a>.&nbsp;
+Worse yet, the <a href="http://www.smarthome.com/1132u.html">PowerLinc USB</a>
+doesn't even have any released information for how to communicate with the
+device in the first place. But each of these
+transceivers that has a control program for Linux has its own unique user
+interface.&nbsp; There are also projects on <a href="http://www.sourceforge.net">http://www.sourceforge.net</a>
+that are crating standard APIs to the transceivers for libraries.&nbsp; But,
+none of these make the devices universally available to shell scripts and
+programs with a common API.&nbsp; So, this project is trying to fill that gap by
+creating that common API with a simple, human readable command structure that
+makes it equally useable for shell scripts, command line usage, and programming.</li>
+	<li><b><a name="FAQ_why2majornumbers">Q: Why are you taking up two major character devices and so many minor
+devices?<br></a>A:</b>&nbsp; This is the $10 million question and the issue that 
+	kept the 1.0 drivers from making it into the kernel source.&nbsp; The 
+	concept behind the standard API is to create a set of devices in /dev that 
+	represent the devices in the house.&nbsp; Since you have 16 housecodes and 16 units per housecode, you
+    have just used up 256 minor numbers which is a full major number.&nbsp; That
+    still leaves you without the ability to have a log, status, or a control
+    interface to
+    the driver.&nbsp; You could also argue (as some have) that I could have used
+    IOCTL calls for the status and controls or used only 16 minor numbers for
+    the housecodes and used IOCTL for management of the units.&nbsp; But, using
+    IOCTL makes the driver useless to shell scripts and would relegate the
+    driver to being just an API to programmers.&nbsp; The basic philosophy is
+    that all of the management of the X10 network should be fully accessible
+    from the command line as well as be accessible from a programming API.</li>
+	<li><b>Q: What happened to x10attach?<br>A: </b>x10attach was a userspace 
+	program that connected the line discipline for the serial system to the 
+	drivers for X10.&nbsp; With the introduction of version 2.0 of the x10 
+	drivers, the userspace portion of the driver does the communications with 
+	the physical transceiver eliminating the need to talk to the Line Discipline 
+	portion of the kernel.</li>
+	<li><b>Q:&nbsp; Why was extended data and extended code removed from the 
+	driver?<br>A:&nbsp; </b>I do not have a single X10 device that transmits or receives 
+	extended data or codes and the approach used in version 1.0 was cumbersome.&nbsp; 
+	I have built in hooks to add this functionality to version 2, but I haven't 
+	seen any user requests that need the functionality.&nbsp; If there is 
+	sufficient demand for extended data/code, I will look to adding the 
+	functionality to the version 2 drivers.</li>
+	<li><b>Q:&nbsp; Why does &quot;echo on &gt; /dev/x10/a&quot; inconsistently turn
+on lights?</b><br><b>A:&nbsp; </b>A couple of people have asked this question so it is worth
+explaining.&nbsp; This question implies that the user doesn't fully understand
+the X10 protocol.&nbsp; Don't take that as an insult if you asked the
+question.&nbsp; It took me a couple of weeks of reading and testing to
+understand the X10 protocol and there is likelihood that I still don't fully
+understand it.&nbsp; Joe User likely hasn't spent that much time reading through
+the X10 standard so this is a valid question.&nbsp; The answer is that the
+protocol allows you to gang devices together by sending their addresses on the
+line without a command.&nbsp; Every device that hears its address will then
+start listening for a command on the line.&nbsp; Once a command is received, if
+another address is seen, the devices will all reset and stop listening for a
+command and start listening for their address again.&nbsp; As a result, you can
+send A1, A2, A5, AON, A3, A4, A6, A8, AOFF to turn A1, A2, and A5 on, then turn
+A3, A4, A6, and A8 off.&nbsp; This would be equivalent to the following:<br>&nbsp;&nbsp;&nbsp; # echo null &gt; /dev/x10/a1<br>&nbsp;&nbsp;&nbsp; # echo null &gt; /dev/x10/a2<br>&nbsp;&nbsp;&nbsp; # echo null &gt; /dev/x10/a3<br>&nbsp;&nbsp;&nbsp; # echo on &gt; /dev/x10/a<br>&nbsp;&nbsp;&nbsp; # echo null &gt; /dev/x10/a3<br>&nbsp;&nbsp;&nbsp; # echo null &gt; /dev/x10/a4<br>&nbsp;&nbsp;&nbsp; # echo null &gt; /dev/x10/a6<br>&nbsp;&nbsp;&nbsp; # echo null &gt; /dev/x10/a8<br>&nbsp;&nbsp;&nbsp; # echo off &gt; /dev/x10/a<br>The exact same results could be obtained by sending A1, AON, A2, AON, A5, AON,
+A3, AOFF, A4, AOFF, A6, AOFF, A8, AOFF. This would be equivalent to the
+following:<br>&nbsp;&nbsp;&nbsp; # echo on &gt; /dev/x10/a1<br>&nbsp;&nbsp;&nbsp; # echo on &gt; /dev/x10/a2<br>&nbsp;&nbsp;&nbsp; # echo on &gt; /dev/x10/a5<br>&nbsp;&nbsp;&nbsp; # echo off &gt; /dev/x10/a3<br>&nbsp;&nbsp;&nbsp; # echo off &gt; /dev/x10/a4<br>&nbsp;&nbsp;&nbsp; # echo off &gt; /dev/x10/a6<br>&nbsp;&nbsp;&nbsp; # echo off &gt; /dev/x10/a8<br>Notice that using the first approach of grouping the devices, you only send 9
+signals on the line.&nbsp; If you do it explicitly, you end up sending 14
+signals on the line.&nbsp; Each signal takes about 1 second (the driver
+automatically adds delay to make sure that the signal gets out on the line) so
+you are looking at a time difference in what it takes to send the signal.&nbsp;
+The second approach has fewer user space commands and is easier to understand
+but takes longer to perform since the commands in the grouping example take 1
+second, and the commands in the second example take 2 seconds each.&nbsp;&nbsp;</li>
+	<li><b>Q: Why is the status out of synch with the actual X10 units?</b><br>
+	<b>A:&nbsp; </b>One of the goals of the driver was to simplify the monitoring of
+the X10 network.&nbsp; At the same time, I didn't want to hide any of the
+protocol from the user.&nbsp; So, I implemented a software version of the X10
+protocol (the userspace portion) which interprets any X10 commands that are
+seen on the line and simulates what should have happened to the units in the
+house.&nbsp; Unfortunately, there are situations where units do not receive the
+command, may have been manually turned on or off, or the unit doesn't respond to
+that particular command.&nbsp; For instance, wall receptacles rarely support
+dim/bright, or ALL_LIGHTS_ON/OFF.&nbsp; The x10 interpreter doesn't know which
+devices are lights and which are receptacles so it assumes that everything is a
+light and responds to every X10 command.&nbsp; Another example is that
+florescent lighting switches rarely support bright/dim commands but the driver
+doesn't know that they are florescent so it goes ahead and updates the status
+table as if a bright/dim actually occurred.&nbsp; The status table is nothing
+more than an approximation of the network based on treating everything as a full
+featured light.</li>
+	<li><b>Q:&nbsp; How do I get a more accurate software status of the X10 units?</b><br>
+	<b>A:&nbsp; </b>The simplest answer is that you can build user level software
+that watches /dev/x10/log and creates its own implementation of the X10 status
+but with awareness of the type of device for each unit in the house.&nbsp; This
+will require reading and understanding the X10 protocol.&nbsp; A second approach would be to buy
+two-way devices and send a status request (with the command &quot;echo status
+&gt; /dev/x10/&lt;unit&gt;&quot;) to the desired X10 unit.&nbsp; The unit will
+then respond with a status answer and the driver will update the state table
+accordingly.&nbsp; The added advantage of two-way devices is that whenever they
+    change state, they send a notice to the network that they have
+    changed.&nbsp; Replacing your switches with two-way switches is currently pretty expensive
+considering that two-way X10 switches cost about 4 times as much as a
+traditional X10 switch.</li>
+	<li><b>Q: Why doesn't &quot;cat&quot; return when reading the X10 devices?</b><br>
+	<b>A:&nbsp; </b>When the program &quot;cat&quot; opens a file to read, it
+    opens it in blocking mode.&nbsp; Since the driver continually receives
+    information, there is no real end-of-file, therefore, when you read the
+    device in blocking mode, the read will wait for more data to arrive for the
+    device.&nbsp; Since most scripts need to just read the current value and
+    then exit, a utility called &quot;nbread&quot; (non-blocking read) has been
+    provided in the utils directory.&nbsp; This utility opens the device with
+    the flag O_NONBLOCK so that when the driver has no more data it returns 0 
+	bytes causing the read() request to return.&nbsp; </li>
+	<li><b>Q:&nbsp; What about the timers and macros for the CM11A?</b><br><b>A:</b>&nbsp; While the timers and macros are really neat features of the
+CM11A, they aren't part of the standard X10 protocol.&nbsp; It would be fairly
+easy to add some IOCTL calls to control these features but I just haven't spent
+the time.&nbsp; My CM11A is somewhat flaky in that it locks up a good bit and
+has some issues with sending me information when it receives it so I have
+focused on the other drivers more.&nbsp;&nbsp;</li>
+	<li><b>Q:&nbsp; What if I find a bug?<br>A:</b>&nbsp; If you think you have found a bug in the drivers, by all means send
+me an email.&nbsp; Please try to send me enough information to repeat your
+situation.&nbsp; If it is fully repeatable, turn on debugging by loading the
+module with debug=1 on the command line of the kernel module and -debug on the 
+	userspace driver and then send me the output of your /var/log/messages
+(or wherever your kernel logs KERN_INFO messages).&nbsp;&nbsp;</li>
+	<li><b>Q:&nbsp; Does it work with an SMP machine?<br>A:</b>&nbsp; Version 
+	2.X of the driver has been extensively tested with a SMP machine with no 
+	problem.</li>
+	<li><b>Q: What X10 features are supported?</b><br><b>A:</b>&nbsp; All drivers support Single Unit On, Single Unit Off, Bright,
+Dim.&nbsp; All drivers except the Firecracker (one-way), support All Units OFF,
+All Lights On, All Lights Off, Status request, Status=on response, Status=off
+response, hail request, hail response.&nbsp; The PowerLinc Serial and the CM11A
+support Extended Data.&nbsp; The PowerLinc Serial, PowerLinc USB, and CM11A support
+    Preset Dim High/Low.&nbsp; None support Extended Code.</li>
+	<li><b>Q:&nbsp; My switch won't respond to the preset dim commands?<br>A:&nbsp; 
+	</b>Most X10 switches do not respond to preset dim commands.&nbsp;
+    You must buy a switch that is explicitly designed to respond to the
+    commands. Sometimes they are called switches with &quot;scenes
+    capability&quot;.&nbsp; They typically cost significantly more than common
+    X10 switches.&nbsp;&nbsp;</li>
+	<li><b>Q:&nbsp; I have an X10 device that requires that I program it by
+    sending electronic signals.&nbsp; How do I program it?<br>A:</b>&nbsp; Manufacturers have moved away from using dials to set the X10
+    address in switches.&nbsp; Many switches are now set up to respond to a unit
+    code by electronically programming them through the X10 network.&nbsp; 
+	<a href="http://www.smarthome.com">SmartHome</a>
+    advises getting Maxi Controller because it can send unitcodes without
+    commands and housecodes without unitcodes.&nbsp; If the WiSH device drivers
+    are installed, the switches can be programmed without purchasing the Maxi
+    Controller.&nbsp; The device driver makes programming these devices simple
+    because it has the capability to let the userspace program send raw commands
+    onto the line.&nbsp;&nbsp;<br><br>Programming usually involves putting the switch into a
+    program mode by holding in or pulling out a button on the device.&nbsp; For
+    Leviton switches it is the green button on the top of the switch.&nbsp; For 
+	<a href="http://www.smarthome.com">SmartHome</a>
+    devices it is usually a small reset button.&nbsp; The instructions will tell
+    you to put the device into programming mode by manipulating the switch and
+    then sending the device's address on the X10 line.&nbsp; Sending the address
+    is accomplished by issuing the command:<br># echo null &gt; /dev/x10/&lt;housecode&gt;&lt;unitcode&gt;<br>
+	<br>For example, if you wanted to program a LampLink (<a href="http://www.smarthome.com/2000s.html">SmartHome
+    product 2000STW</a>) to respond to unit E16 and turn on the feature for
+    recognizing local load, you would press the small black button on the side
+    and hold for 5 seconds.&nbsp; The lamp would come on.&nbsp; You then issue
+    the commands:<br># echo null &gt; /dev/x10/e15<br># echo on &gt; /dev/x10/e<br>The first command programs the switch as E15, and the second one tell it to
+    turn on local load detection.<br><br>Similarly, to transmit the clear sequence of &quot;O16, N16, M16, P16,
+    M16&quot; to a LampLink, you would issue the following commands:<br># echo null &gt; /dev/x10/o16<br># echo null &gt; /dev/x10/n16<br># echo null &gt; /dev/x10/m16<br># echo null &gt; /dev/x10/p16<br># echo null &gt; /dev/x10/m16
+  </li>
+	<li><b>Q:&nbsp; Why isn't Manufacturer X's transceiver supported?<br>A:</b>&nbsp; My intention is to write drivers for every transceiver that would
+fit with the philosophy of the project.&nbsp; Things like the Othello or
+Timecommander don't really make sense for this project.&nbsp; Also, I am paying
+for this out of my pocket so if the transceiver is overly expensive or there are
+is no programming documentation, the chances of me buying one are slim.&nbsp;&nbsp;If 
+	you are a manufacturer of a transceiver and would like to have it supported 
+	in this project, I would be happy to work on the device provided a couple of 
+	things can happen.&nbsp; 1)&nbsp; I need 2 of the transceivers so that I can 
+	test the send and receive simultaneously.&nbsp; 2)&nbsp; protocol and 
+	programming information to allow me to write the drivers.&nbsp; And 3) if 
+	possible example code for communicating with the device under whatever OS 
+	currently supports it.&nbsp; Programming for the PowerLinc USB was a unique 
+	situation in that I was out of work and had the time to spend a week coaxing 
+	the protocol out of the device.&nbsp; But, fortunately, I have a job now and 
+	don't have the time to dissect the device.</li>
+	<li><b>Q:&nbsp; Have you tested the drivers with Manufacturer X's switch?<br>A:</b>&nbsp; Again, I am limited in budget and can't afford to buy every switch
+that is out there.&nbsp;&nbsp; SmartHome was very kind and gave me a couple of
+    two way switches to do testing.&nbsp; This enabled me to complete the preset
+    dim/bright portion of the drivers.&nbsp;&nbsp;</li>
+	<li><b>Q:&nbsp; I keep seeing X10 codes, but I am not sending them?<br>A:</b>&nbsp; These messages likely existed before the driver was installed
+    but now that you are seeing everything that is on your X10 network, you are
+    seeing this noise.&nbsp; There are a couple of things that can cause
+    this.&nbsp; On my system, when a florescent light begins to reach its end of
+    life, before I can visibly notice the flickering, the X10 network starts
+    getting flooded with &quot;STATUS J&quot; messages.&nbsp; Mine have always
+    been very consistent when the florescent lights wither.&nbsp; Another common
+    cause for it is one of your neighbors using X10.&nbsp; One of the
+    reasons that so many housecodes were provided was so that neighbors on the
+    same line can coexist.&nbsp; If you are seeing the same housecode that you
+    are using, change to a different housecode so that you and your neighbor can
+    coexist.&nbsp; If you are really set on using the housecode that you have,
+    you could talk to your neighbor about changing.</li>
+	<li><b>Q:&nbsp; All of your examples are run as the user
+    &quot;root&quot;.&nbsp; Isn't that unsafe?<br>A:</b>&nbsp; It is potentially unsafe so you might want to run your X10
+    network from a less privileged user.&nbsp; You must change the permissions
+    on the files in /dev/x10/ so that the user can read and write to the device
+    files.&nbsp; By default the files are created with write capability only for
+    &quot;root&quot;.&nbsp; The userspace program can run as a user or as root 
+	without any problems but the kernel modules must be loaded as root.</li>
+	<li><b>Q:&nbsp; Can I load two transceivers at the same time on the same
+    machine?<br>*** A:</b> Yes you can provided that you load the second
+    drivers with the data_major and control_major parameters set to something
+    other than what is used by the first driver.&nbsp; You will need to set up
+    different character devices for each x10 device that you intend to
+    control.&nbsp; makedev.sh will accept 3 parameters to override the
+    defaults.&nbsp; The first must be the major character device for data, the
+    second the major character device for control, and the third must be the
+    directory for the devices.&nbsp; For example, to set the system up to have
+    both the Firecracker and the CM11A loaded at the same time on ttyS0, the
+    following commands can be used:<br><br># scripts/makedev.sh 120 121 /dev/cm11a<br># scripts/makedev.sh 122 123 /dev/cm17a<br># insmod x10_cm17a.o data_major=122 control_major=123 port=0x3f8<br># insmod x10_cm11a.o data_major=120 control_major=121<br># utils/x10attach -11a /dev/ttyS0<br>
+	<br>To turn on e15 through the cm11a, execute the command:<br># echo 1 &gt; /dev/cm11a/e15<br>
+	<br>To turn off e15 through the cm17a, execute the command:<br># echo 0 &gt; /dev/cm17a/e15</li>
+	<li><b>Q:&nbsp; How do I set up aliases for my X10 devices?<br>A:</b>&nbsp; This is one of the primary advantages to the standard
+    interface.&nbsp; By creating symbolic links to the device, you can write
+    scripts or programs to control and watch the devices and can just change the
+    links whenever you want to change the configuration of the house. For
+    instance, with the following commands exectuted:<br><br># mkdir /automation<br># ln -s /dev/x10/e1 /automation/frontflood<br># ln -s /dev/x10/e2 /automation/backflood<br># ln -s /dev/x10/e3 /automation/extbreakfast<br># ln -s /dev/x10/e4 /automation/frontgarage<br># ln -s /dev/x10/e5 /automation/backgarage<br># ln -s /dev/x10/e6 /automation/frontporch<br># ln -s /dev/x10/e7 /automation/backporch<br># ln -s /dev/x10/e8 /automation/extbasement<br># ln -s /dev/x10/e9 /automation/gym<br># ln -s /dev/x10/e10 /automation/foyer<br># ln -s /dev/x10/e11 /automation/familyroom<br># ln -s /dev/x10/e15 /automation/curio<br># ln -s /dev/x10/e16 /automation/lightsensor<br># ln -s /dev/x10/g1 /automation/garagestatus<br># ln -s /dev/x10/g11 /automation/statusgaragedouble<br># ln -s /dev/x10/g12 /automation/statusgaragesingle<br>
+	<br>You could now execute the following command to turn on the light in the
+    foyer:<br><br>$ echo 1 &gt; /automation/foyer<br><br>If you want to have the light sensor turn on the flood lights, use the
+    x10watch utility as follows:<br><br>$ x10watch /automation/lightsensor -1 &quot;echo on &gt; /automation/frontflood&quot;
+    -0 &quot;echo off &gt; /automation/frontflood&quot; &amp;<br>$ x10watch /automation/lightsensor -1 &quot;echo on &gt; /automation/backflood&quot;
+    -0 &quot;echo off &gt; /automation/backflood&quot; &amp;</li>
+	<li><b>Q:&nbsp; What is wishweb?<br>A:</b>&nbsp; To demonstrate the ease of programming to the X10 device
+    drivers, a small client and server have been created.&nbsp; Combined they
+    are called wishweb.&nbsp; The client is written in Java as an applet but it
+    can run as a standalone Java application on any machine with the java 1.4 or
+    higher runtime environment.&nbsp; A precompiled version of the Java applet
+    is provided in x10web.jar.&nbsp; The applet looks almost identical to the
+    SmartHome Synapse software and provides a very simple interface to
+    controlling the X10 devices.&nbsp; It runs in Netscape Navigator or in
+    Internet Explorer and will automatically request to download the Java
+    runtime environment if the environment has not been installed on the local
+    client.&nbsp;&nbsp;</li>
+	<li><b>Q:&nbsp; Um, wishweb is kinda dorky.&nbsp; Why something so simple?<br>A:</b>&nbsp; Dude, you gotta crawl before you can walk.&nbsp; I modeled
+    wishweb after the user interface from the SmartHome Synapse software and
+    yes, it is a very limited subset of what the SmartHome software can
+    do.&nbsp; But, it is a very good representation of the raw protocol.&nbsp;
+    Prior to this project, the most complex Java application I had written was a
+    News Client a year ago when I happened across a Java programming book called
+    &quot;Learning Java&quot; and decided to learn Java.&nbsp; Getting it all to
+    work together was a pretty big challenge.&nbsp; As with the entire history
+    of this project, I build things by generating the concept, prototyping
+    something and getting it working for proof of concept, and once all works, I
+    start expanding.&nbsp; So, wishweb is the proof of concept.&nbsp; x10home is
+    the more advanced Java interface that you may want to consider if you find
+    x10web to simple.</li>
+	<li><b>Q:&nbsp; Why does the x10log show that commands were transmitted even
+    though the command timed out?<br>A</b>:&nbsp; This is a tradeoff of either having the state machine reflect
+    the order of transmission or reflect the ability to transmit.&nbsp; The
+    problem that is being traded off here is that when sending the status
+    command, some transceivers respond only with their status (rather than with
+    their address followed by their status).&nbsp; The protocol specification
+    isn't clear on what the transmitter must do in this case.&nbsp; In the case
+    where the two-way switch is sending only its status, it is assuming that
+    since the original status request was sent with a specific address, any
+    response will be for that same address.&nbsp; Regarding the drivers, the
+    reception of the status from the network always comes back before the
+    transmit function can complete resulting in the state machine thinking that
+    it received something before it transmitted something.&nbsp; The transmitter
+    only updated the state machine if the transmit function completed.&nbsp; The
+    reasons for it not completed would include the transceiver being unavailable
+    or the transmitter being blocked by a noisy line.&nbsp; Prior to version
+    1.6.3, the driver took the safe method of only updating the state machine if
+    the transmitter completed.&nbsp; But, starting with version 1.6.3, the state
+    machine is updated regardless of the completion of the transmitter to make
+    sure that the state machine reflects the optimistic or expected state of the
+    network.</li>
+	<li><b>Q:&nbsp; I am just getting into X10.&nbsp; What transceiver and
+    switches would you recommend?<br>A:</b>&nbsp; In writing the drivers I have tried to stay neutral in my
+    comments and support for the various transceivers.&nbsp; I have all 3 that
+    are supported and have used all 3 for a significant length of time and they 
+	all work.&nbsp; So, I will not recommend one over the other.&nbsp; I will 
+	tell you that I use the PowerLinc USB and PowerLinc Serial for my own home 
+	automation so you will tend to see that I release new features on these 
+	first.<br><br>As for switches, the drivers were written to work with all standard X10
+    switches and devices.&nbsp; Devices that require the extended analog data
+    have not been tested with the drivers so your mileage may vary when buying
+    these devices.<br><br>So, for your initial setup, start small and learn as you go.&nbsp; No need
+    to drop $1000 on a bunch of equipment if you aren't ready to use it
+    yet.&nbsp; Get a transceiver (PowerLinc USB, PowerLinc Serial, or CM11A) and
+    get a switch module that plugs into the wall (something like the LampLinc
+    2-way from <a href="http://www.smarthome.com/2000S.html">Smarthome</a>).&nbsp;
+    Get your Linux system set up properly, install the kernel source, and build
+    the drivers.&nbsp; The X10 hardware for this will cost about $70.&nbsp; If
+    you are an avid Linux user and administrator, this will take you all of an
+    hour to get going.&nbsp; If you are new to Linux, this could take days or
+    weeks depending on how fast you learn and how good you are at following
+    directions.&nbsp; Once you have the drivers working, tackle getting the WEB
+    interface going so that you have GUI control of the switch.&nbsp; After you
+    have mastered that, buy more switches depending on what you want to do.</li>
+	<li><b>Q:&nbsp; What are some projects or examples of uses of the WiSH
+    drivers?<br>A:</b>&nbsp; Before I put out some
+    examples, let me just say that I wrote the drivers to provide as much
+    flexibility as possible so the limits to the projects are only your budget
+    and imagination.<br><br><b>Garage Door alarm and night light:</b>&nbsp; Get an X10 Chime module (<a href="http://www.smarthome.com/2045.html">SmartHome
+    Item 2045</a>), an X10 IOLinc 4-termina two way sensor (<a href="http://www.smarthome.com/1624.html">SmartHome
+    Item 1624</a>), garage door sensors (<a href="http://www.smarthome.com/7455.html">SmartHome
+    Item 7456</a>), and a LampLinc Module (<a href="http://www.smarthome.com/2000S.html">SmartHome
+    Item 2000S</a>).&nbsp; The garage door sensor model 7456 has both NO and NC
+    wires.&nbsp; Connect the NO wires to the IOLinc terminals and mount the
+    sensor on the wall with the magnet on the garage door.&nbsp; When the door
+    is closed the light on the IOLinc will be off.&nbsp; When the door is open,
+    the light will turn on.&nbsp; Program the IOLinc to send its signal on a
+    housecode (I use G for garage) and a unit (such as 10).&nbsp; Now, set the
+    computer up to use x10watch to listen for G10 to change state.&nbsp; When
+    G10 is off, turn off the LampLinc.&nbsp; When G10 turns on, turn on the
+    LampLinc and turn on the Chime module.&nbsp; Set the x10watch program to
+    delay for 5 minutes after the signal is heard so that&nbsp; the light stays
+    on to give you time to walk in the house and then turns off after 5 minutes
+    when the door is closed.<br><br><b>Automatic garage closer</b>:&nbsp; Get an X10 IOLinc 4-termina two way
+    sensor (<a href="http://www.smarthome.com/1624.html">SmartHome Item 1624</a>),
+    and a garage door sensor (<a href="http://www.smarthome.com/7455.html">SmartHome
+    Item 7456</a>) [same as above].&nbsp; Program the first channel of the
+    IOLinc as input and wire it to the garage door sensor.&nbsp; Program the
+    second channel of the IOLinc as an output and connect it to the wires that
+    are used by the button to open and close the garage door from the
+    wall.&nbsp; Now, write a C program or shell script to watch the first
+    channel of the IOLinc for the door to open, count down a timer, and if the
+    door isn't already closed, send an ON then OFF signal to the second channel
+    of the IOLinc to get the garage door motor to close the door. If you want to
+    get really fancy, use the NO circuit of the sensor to prevent the system
+    from opening the garage door.&nbsp;<i> (Note, I was initially concerned that
+    the IOLinc might never get the off signal with the effect of holding the
+    button down.&nbsp; If you do the fancy version, this won't be a problem at
+    all.&nbsp; But, if you don't use the door sensor to complete the circuit,
+    you can still just send numerous off signals to make sure that it gets it.)</i><br>
+	<br><b>Alarm automation:</b>&nbsp; I have a DSC32 alarm in the house that can
+    produce X10 signals.&nbsp; Every light in the hall and public rooms in the
+    house have X10 light switches.&nbsp; The alarm is wired so that each
+    individual door is a single zone so when the alarm goes off, it can send an
+    X10 signal to indicate the entry point.&nbsp; Using x10watch, the computer
+    can watch for the DSC codes on the X10 network and turn the lights on
+    throughout the house in a sequence such that it appears that someone is
+    walking through the house turning lights on as the person enters the
+    room.&nbsp;&nbsp;<br><br><b>Dusk/Dawn light control</b>:&nbsp; Get a Leviton Dusk/Dawn sensor (<a href="http://www.smarthome.com/4235.html">SmartHome
+    Item 4235</a>) and wire it either permanently to the outside of the house or
+    set it in a window where it can sense the outside light.&nbsp; Set x10watch
+    up to listen for the signal from the sensor and turn the outside lights for
+    the house on and off based on the light.&nbsp; Extend this just a tad by
+    using the sensor to have x10watch turn on the flood lights, porch lights,
+    and garage lights.&nbsp; At bedtime, say around 11:00pm, use a cron job to
+    turn off the flood lights so that you can sleep without the room being
+    filled with light, turn off the outside lights, and turn on the low level
+    lights over each of the outside doors.&nbsp; At dawn, use the signal from
+    the sensor to have x10watch turn off all lights.<br><br><b>Well flood control:&nbsp;</b> If you live out in a rural area and have a
+    well, you can have the well pump turn off if there is flooding in the
+    house.&nbsp; Get a WaterBug (<a href="http://www.smarthome.com/7160.html">SmartHome
+    Item 7160</a>), a PowerFlash interface (<a href="http://www.smarthome.com/4060.html">SmartHome
+    Item 4060</a>), and a 220 V heavy duty X10 switch (<a href="http://www.smarthome.com/2210I.html">SmartHome
+    Item 2210</a>).&nbsp; Wire the WaterBug up so that it can sense water on the
+    floor in the basement and wire the bug to the powerflash interface.&nbsp;
+    Now use x10watch to watch for a signal from the powerflash indicating that
+    there is water.&nbsp; When the indicator is seen, turn off the well pump
+    with the 220 V switch.&nbsp;&nbsp;</li>
+</ol>
+
+<hr>
+<h1 align="center"><b><a name="Installation">Installation</a> (from source)</b></h1>
+<h3><b><a name="compiling">1) Compiling and install the drivers</a></b></h3>
+<p>To compile the drivers, retrieve the source code, expand the source 
+distribution, and build it with the &quot;make command&quot;.&nbsp; The drivers will be 
+built for the currently running kernel so you much have booted the machine off 
+of the kernel you intend to use the drivers.&nbsp; After you have built the 
+drivers, you must install them.&nbsp; Here are the commands and the results:</p>
+<ol>
+	<li>Get the source code to the WiSH distribution and uncompress it to a 
+	temporary location</li>
+	<li>Change to the directory that was created when you uncompressed it (ex:&nbsp;
+	<b>tar xvzf wish-2.1.0.tar.gz; cd wish-2.1.0</b>)</li>
+	<li>Type <b>make</b></li>
+	<li>Type<b> make install</b><ol>
+	<li>The daemons plusbd, cm11ad, and pld will be copied to /usr/sbin</li>
+	<li>The utilities x10logd and x10watch will be copied to /usr/sbin</li>
+	<li>The utilities nbread and nbecho will be copied to /usr/bin</li>
+	<li>The kernel modules will be copied to your currently running module 
+	directory for your kernel (for example 
+	/lib/modules/2.6.10/kernel/drivers/char/x10)</li>
+</ol>
+	</li>
+</ol>
+<h3>2) <a name="Loadthemodules">Load the drivers</a></h3>
+<p>Now that you have the drivers compiled and installed, you need to load them.&nbsp; 
+First you must load the device manager (x10.o for kernel 2.4 or x10.ko for 
+kernel 2.6) followed by running the 
+appropriate daemon for the X10 transceiver that you own.</p>
+<p>Scripts have been provided in the example_scripts/
+directory (and installed to /usr/local/etc) to automate starting and stopping the drivers.&nbsp; Copy the
+appropriate script to /etc/rc.d/init.d/x10 for for a RedHat system or call the
+appropriate script from /etc/rc.d/rc.local on a Slackware system.&nbsp; On a
+RedHat system, you can run chkconfig to install in the appropriate runlevels.&nbsp;
+For example, &quot;chkconfig --level 35 x10.pl&quot; will cause the driver for 
+the serial PowerLinc to be
+loaded for run levels 3 and 5.</p>
+<p>To load the modules by hand (recommended when testing for the first time),
+load the device module and then load the userspace programs per the table below.</p>
+<div align="left">
+	<table border="1">
+		<tr>
+			<td>Serial PowerLinc</td>
+			<td>
+			<div align="left">
+				<table border="0">
+					<tr>
+						<td>modprobe x10</td>
+					</tr>
+					<tr>
+						<td>/usr/sbin/pl -device /dev/ttyS0</td>
+					</tr>
+					<tr>
+						<td>/usr/sbin/x10logd</td>
+					</tr>
+				</table>
+			</div>
+			</td>
+		</tr>
+		<tr>
+			<td>USB PowerLinc</td>
+			<td>
+			<div align="left">
+				<table border="0">
+					<tr>
+						<td>modprobe x10</td>
+					</tr>
+					<tr>
+						<td>/usr/sbin/plusb -device /dev/usb/hiddev0</td>
+					</tr>
+					<tr>
+						<td>/usr/sbin/x10logd</td>
+					</tr>
+				</table>
+			</div>
+			</td>
+		</tr>
+		<tr>
+			<td>CM11A</td>
+			<td>
+			<div align="left">
+				<table border="0">
+					<tr>
+						<td>modprobe x10</td>
+					</tr>
+					<tr>
+						<td>/usr/sbin/cm11ad -device /dev/ttyS0</td>
+					</tr>
+					<tr>
+						<td>/usr/sbin/x10logd</td>
+					</tr>
+				</table>
+			</div>
+			</td>
+		</tr>
+	</table>
+</div>
+<p>The parameters that can be specified for the x10.o module are:</p>
+
+<ul>
+  <li><b>data_major</b>:&nbsp; the major device number for
+    accessing the individual units (default=120)</li>
+	<li><b>control_major</b>: the major device number for
+    accessing the housecodes and status/log functions (default=101)</li>
+	<li><b>debug</b>: setting to 1 will write tons of stuff to
+    the console to trace the API (default=0)</li>
+	<li><b>syslogtraffic</b>:&nbsp; when this flag is set to 1, all traffic on the
+    X10 network will be written to syslogd as kern.notice messages.&nbsp; These
+    will typically go to the console, /var/log/dmesg, and /var/log/messages.&nbsp;
+    If you have a busy network, the traffic on the X10 network could easily fill
+    up your network.&nbsp; Setting this to 0 stops the driver from logging
+    traffic to the syslogs.&nbsp; (default=0 which is off).</li>
+</ul>
+<p>The parameters that can be specified for the userspace daemons are:</p>
+<ul>
+	<li>-<b>api:</b>&nbsp; The X10 device driver interface file (default: 
+	/dev/x10/.api)</li>
+	<li>-<b>pid</b>:&nbsp; The file to write the driver PID to (default: /var/run/x10d.pid)</li>
+	<li>-<b>tag</b>:&nbsp; The tag to be written to the syslog (default is the 
+	name of the daemon)</li>
+	<li>-<b>timeout</b>: Timeout in milliseconds&nbsp; for waiting for a 
+	response from the device or the API (default:&nbsp; 1000)</li>
+	<li>-<b>retries</b>:&nbsp; Number of times to retry activity before giving 
+	up (default: 5)</li>
+	<li>-<b>delay</b>:&nbsp; Number of milliseconds to delay between accesses to 
+	the device (default is dependent on the daemon).&nbsp; This is important for 
+	transceivers that appear to be flakey or do not respond reliably. By 
+	inserting a pause after each device access, the device is given time to 
+	latch the data before being accessed again.&nbsp; </li>
+	<li>-<b>fakereceive</b>:&nbsp; causes the driver to simulate receiving what 
+	it sends.&nbsp; The default depends on the driver being used.&nbsp; Most 
+	transceivers do not hear what they send at the time that they send it.&nbsp; 
+	However, transceivers like the PowerLinc Serial hear their own signals.&nbsp; 
+	The default for the driver can be overridden on the command line.&nbsp; Note 
+	that the log file will have a different format for any data that has been 
+	artificially logged due to fakereceive.&nbsp;</li>
+	<li>-<b>debug</b>:&nbsp; turn on debug</li>
+	<li>-<b>device</b>:&nbsp; device interface for transceiver (no default)</li>
+</ul>
+<p>If everything has been done correctly, you should now have the drivers loaded
+and you should have a line in your kernel log indicating that they have
+started.&nbsp; Move on to the userspace usage for actually sending commands and
+watching the status of the network.</p>
+<h3><a name="filelocations">4) </a><a name="stopping">Unloading/Stopping the driver</a></h3>
+<p>To unload the drivers, you must first stop all of the daemons that are 
+accessing the device and then you can unload the device module.&nbsp; To kill 
+the daemons you must send them a HUP command.&nbsp; Note that the transceiver 
+daemon starts a thread that will show up in your process list.&nbsp; You must 
+kill the lowest number process to properly free up the drivers.&nbsp; To make 
+this convenient, the daemons write the process number to a file in /var/run/x10d.pid.</p>
+<p>For example, to stop the USB PowerLinc, execute the following commands:</p>
+<p>kill -HUP `cat /var/run/x10d.pid`<br>
+kill -QUIT `cat /var/run/x10logd.pid`<br>
+kill -QUIT `cat /var/run/x10watch.pid`<br>
+rmmod x10</p>
+<h3>6) Starting the drivers in /etc/rc.d</h3>
+<p>During the installation process, three files are copied to /var/rc.d/init.d.&nbsp; 
+These are x10.plusb, x10.cm11a, and x10.pl.&nbsp; These files are used to start 
+the drivers automatically when the system is started.&nbsp; Below are the 
+commands needed to activate the driver associated with your transceiver:</p>
+<div align="left">
+	<table border="1">
+		<tr>
+			<td>Transceiver</td>
+			<td>Command to setup autostart</td>
+		</tr>
+		<tr>
+			<td>CM11A</td>
+			<td>chkconfig --level 35 x10.cm11a on</td>
+		</tr>
+		<tr>
+			<td>PowerLink Serial</td>
+			<td>chkconfig --level 35 x10.pl on</td>
+		</tr>
+		<tr>
+			<td>PowerLink USB</td>
+			<td>chkconfig --level 35 x10.plusb on</td>
+		</tr>
+	</table>
+</div>
+<hr>
+<h1 align="center"><b><a name="UserspaceUsage">Userspace Usage</a>:</b></h1>
+<p>Once the devices have been created and loaded, /var/log/messages should show &quot;<a href="mailto:x10%20Transciever%20module%20v%3cversion%3e%20(wsh@sprintmail.com)">x10 Transciever module
+v&lt;version&gt; (wsh@sprintmail.com)</a>&quot; to indicate that the device module 
+has successfully been installed and will contain &quot;transmitter connected&quot; to 
+indicate that the daemon successfully started.</p>
+<p>At this point, normal userspace programs can be used to access the X10
+network.</p>
+<p>The following commands can be sent to both the individual units
+(/dev/x10/a1) or the housecodes (/dev/x10/a).&nbsp; <font color="#FF0000">(If
+a command is more than 3 characters long, the first 3 characters can be sent to
+have the same effect if the command is unique in the first three characters.)</font>:</p>
+<table border="1" width="841">
+  <tr>
+    <td width="117" align="center"><b>CMD</b></td>
+    <td width="708" align="center"><b>Explanation</b></td>
+  </tr>
+  <tr>
+    <td width="117">1, on, ON</td>
+    <td width="708">Turns the device or group of devices on</td>
+  </tr>
+  <tr>
+    <td width="117">0, off, OFF</td>
+    <td width="708">Turns the device or group of devices off</td>
+  </tr>
+  <tr>
+    <td width="117">-, dim, DIM</td>
+    <td width="708">Sends the DIM command to the device or group of
+      devices.&nbsp; Note that not all devices support the DIM command in which
+      case the device will not change.</td>
+  </tr>
+  <tr>
+    <td width="117">+, bright, BRIGHT</td>
+    <td width="708">Sends the BRIGHT command to the device or group of
+      devices.&nbsp; Note that not all devices support the BRIGHT command in
+      which case the device will not change.</td>
+  </tr>
+  <tr>
+    <td width="117">status</td>
+    <td width="708">Sends a status request to the last individual device
+      specified</td>
+  </tr>
+</table>
+<p>The following commands can be sent to the housecodes but not to the
+individual units:/</p>
+<table border="1" width="841">
+  <tr>
+    <td width="117" align="center"><b>CMD</b></td>
+    <td width="708" align="center"><b>Explanation</b></td>
+  </tr>
+  <tr>
+    <td width="117">aon</td>
+    <td width="708">Turns all lights on for the specified housecode</td>
+  </tr>
+  <tr>
+    <td width="117">aoff</td>
+    <td width="708">Turns all lights off for the specified housecode</td>
+  </tr>
+  <tr>
+    <td width="117">uoff</td>
+    <td width="708">Turns all units off for the specified housecode</td>
+  </tr>
+  <tr>
+    <td width="117">pdimhigh</td>
+    <td width="708">For devices that support Preset Dim, this will send the
+      housecode as the dim level for the light.&nbsp; See below for how to
+      utilize the preset dim levels.</td>
+  </tr>
+  <tr>
+    <td width="117">pdimlow</td>
+    <td width="708">For devices that support PresetDim, this will send the
+      housecode as the dim level for the light.&nbsp; See below for how to
+      utilize the preset dim levels.</td>
+  </tr>
+</table>
+<p>The following command can be sent only to full unitcode addresses (e.g. a1,
+a2, a3)</p>
+<table border="1" width="841">
+  <tr>
+    <td width="117" align="center"><b>CMD</b></td>
+    <td width="708" align="center"><b>Explanation</b></td>
+  </tr>
+  <tr>
+    <td width="117">nothing, null</td>
+    <td width="708">Sends unit code on line without a function code (used to
+      group unit codes.&nbsp; See example below.)</td>
+  </tr>
+  <tr>
+    <td width="117">ps#</td>
+    <td width="708">Sends a preset dim sequence to the target unit.</td>
+  </tr>
+</table>
+<p>The following standard X10 commands are not supported at this time:</p>
+<ul>
+  <li>Extended Code</li>
+</ul>
+<h3><b><a name="Exampleusage">Example usage</a>:</b></h3>
+<table border="1" width="841">
+  <tr>
+    <td width="185" valign="top">$ echo 1 &gt; /dev/x10/a10</td>
+    <td width="640" valign="top">Turns on device A10</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ echo 0 &gt; /dev/x10/a11</td>
+    <td width="640" valign="top">Turns off device A11</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ echo bri &gt; /dev/x10/a11</td>
+    <td width="640" valign="top">Sends bright command to device A11</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ echo - &gt; /dev/x10/a11</td>
+    <td width="640" valign="top">Sends dim command to device A11</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ echo null &gt; /dev/x10/e1<br>
+      $ echo on &gt; /dev/x10/e1</td>
+    <td width="640" valign="top">Turns on device E1</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ echo on &gt; /dev/x10/e1</td>
+    <td width="640" valign="top">Turns on device E1</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ echo aon &gt; /dev/x10/e</td>
+    <td width="640" valign="top">Sends All Lights On to housecode E</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ cat /dev/x10/e11</td>
+    <td width="640" valign="top">Reads the last known status of device E11</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ cat /dev/x10/a</td>
+    <td width="640" valign="top">Reads the last known status of all units on
+      housecode A</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ cat /dev/x10/status</td>
+    <td width="640" valign="top">Reads the last known status of all 256 units
+      in the system</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ echo null &gt; /dev/x10/e5<br>
+      $ echo &gt; /dev/x10/e10<br>
+      $ echo on &gt; /dev/x10/e</td>
+    <td width="640" valign="top">The first two commands target the individual
+      units without a command so that they group on the line.&nbsp; After
+      sending the units without commands, a command can be sent on the line and
+      all grouped units will respond to the command.&nbsp; In this case, both E5
+      and E10 will turn on.&nbsp; The grouping remains in effect until a
+      different housecode is sent on the line or another individual unit is
+      specified.</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ echo null &gt; /dev/x10/e15<br>
+      $ echo pdimlow &gt; /dev/x10/g</td>
+    <td width="640" valign="top">Sets the unit at address E15 to light level
+      32%.&nbsp;</td>
+  </tr>
+  <tr>
+    <td width="185" valign="top">$ echo ps11 &gt; /dev/x10/e15</td>
+    <td width="640" valign="top">Sets the unit at address E15 to light level 32%</td>
+  </tr>
+</table>
+<p> Preset Dimming requires some extra work on the users
+    part.&nbsp; The way the protocol specifies all operations for X10 is that
+    you first address a unit in one transmission, and then you send the
+    command.&nbsp; Normally the command is sent to the same housecode as the
+    addressed unit so the driver can accept both the command and the housecode
+in one transaction; however, Preset Dim uses the housecode as the dim
+    level.&nbsp; Rather than requiring the userspace program to understand the
+sequence and mapping, the driver will accept the command &quot;ps#&quot; where #
+is a value between 1 and 32 inclusive. The following table shows the mapping of the housecodes to dim
+    levels:<br>
+</p>
+    <table border="1">
+      <tr>
+        <td align="center"><b>level</b></td>
+        <td align="center"><b>CMD</b></td>
+        <td align="center"><b>PresetDim Low<br>
+          housecode</b></td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td align="center"><b>level</b></td>
+        <td align="center"><b>CMD</b></td>
+        <td align="center"><b>PresetDim Low<br>
+          housecode</b></td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td align="center"><b>level</b></td>
+        <td align="center"><b>CMD</b></td>
+        <td align="center"><b>PresetDim High<br>
+          housecode</b></td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td align="center"><b>level</b></td>
+        <td align="center"><b>CMD</b></td>
+        <td align="center"><b>PresetDim High<br>
+          housecode</b></td>
+      </tr>
+      <tr>
+        <td>0%</td>
+        <td align="center">ps1</td>
+        <td align="center">M</td>
+        <td bgcolor="#000000">&nbsp;</td>
+        <td>26%</td>
+        <td align="center">ps9</td>
+        <td align="center">E</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>52%</td>
+        <td align="center">ps17</td>
+        <td align="center">M</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>77%</td>
+        <td align="center">ps25</td>
+        <td align="center">E</td>
+      </tr>
+      <tr>
+        <td>3%</td>
+        <td align="center">ps2</td>
+        <td align="center">N</td>
+        <td bgcolor="#000000">&nbsp;</td>
+        <td>29%</td>
+        <td align="center">ps10</td>
+        <td align="center">F</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>55%</td>
+        <td align="center">ps18</td>
+        <td align="center">N</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>81%</td>
+        <td align="center">ps26</td>
+        <td align="center">F</td>
+      </tr>
+      <tr>
+        <td>6%</td>
+        <td align="center">ps3</td>
+        <td align="center">O</td>
+        <td bgcolor="#000000">&nbsp;</td>
+        <td>32%</td>
+        <td align="center">ps11</td>
+        <td align="center">G</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>58%</td>
+        <td align="center">ps19</td>
+        <td align="center">O</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>84%</td>
+        <td align="center">ps27</td>
+        <td align="center">G</td>
+      </tr>
+      <tr>
+        <td>10%</td>
+        <td align="center">ps4</td>
+        <td align="center">P</td>
+        <td bgcolor="#000000">&nbsp;</td>
+        <td>35%</td>
+        <td align="center">ps12</td>
+        <td align="center">H</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>61%</td>
+        <td align="center">ps20</td>
+        <td align="center">P</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>87%</td>
+        <td align="center">ps28</td>
+        <td align="center">H</td>
+      </tr>
+      <tr>
+        <td>13%</td>
+        <td align="center">ps5</td>
+        <td align="center">C</td>
+        <td bgcolor="#000000">&nbsp;</td>
+        <td>39%</td>
+        <td align="center">ps13</td>
+        <td align="center">K</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>65%</td>
+        <td align="center">ps21</td>
+        <td align="center">C</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>90%</td>
+        <td align="center">ps29</td>
+        <td align="center">K</td>
+      </tr>
+      <tr>
+        <td>16%</td>
+        <td align="center">ps6</td>
+        <td align="center">D</td>
+        <td bgcolor="#000000">&nbsp;</td>
+        <td>42%</td>
+        <td align="center">ps14</td>
+        <td align="center">L</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>68%</td>
+        <td align="center">ps22</td>
+        <td align="center">D</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>94%</td>
+        <td align="center">ps30</td>
+        <td align="center">L</td>
+      </tr>
+      <tr>
+        <td>19%</td>
+        <td align="center">ps7</td>
+        <td align="center">A</td>
+        <td bgcolor="#000000">&nbsp;</td>
+        <td>45%</td>
+        <td align="center">ps15</td>
+        <td align="center">I</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>71%</td>
+        <td align="center">ps23</td>
+        <td align="center">A</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>97%</td>
+        <td align="center">ps31</td>
+        <td align="center">I</td>
+      </tr>
+      <tr>
+        <td>23%</td>
+        <td align="center">ps8</td>
+        <td align="center">B</td>
+        <td bgcolor="#000000">&nbsp;</td>
+        <td>48%</td>
+        <td align="center">ps16</td>
+        <td align="center">J</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>74%</td>
+        <td align="center">ps24</td>
+        <td align="center">B</td>
+        <td align="center" bgcolor="#000000">&nbsp;</td>
+        <td>100%</td>
+        <td align="center">ps32</td>
+        <td align="center">J</td>
+      </tr>
+    </table><br>To accomplish sending a preset dim command, the user can send
+the housecode/unit address in one command and then the preset command to the
+appropriate housecode.&nbsp; For example, to send PRESET DIM 32% to E15, the
+commands would be:<br>
+# echo null &gt; /dev/x10/e15<br>
+# echo pdimlow &gt; /dev/x10/g
+<p>Alternately, to accomplish sending PRESET DIM 32% to E15, the command would
+be:<br>
+# echo ps11 &gt; /dev/x10/e15</p>
+<h3><a name="ScriptExamples">Script Examples</a></h3>
+<p>The directory example_scripts provides some scripts that I use at home
+to automate a few basic tasks.&nbsp;&nbsp;</p>
+<p>The scripts named x10.*.sh are examples of the startup scripts that can be
+copied to /etc/rc.d to automate starting the X10 drivers.&nbsp; These scripts
+automatically start the x10logd daemon and load the drivers.&nbsp; The /var/log/x10log
+is cleared by the script at startup.&nbsp; To use the script outside of the
+startup environment, it requires one argument to tell it what action to
+take.&nbsp; For example, to start the PowerLinc USB driver, you would execute
+the command &quot;x10.plusb.sh start&quot;.&nbsp; Similary, to stop the
+PowerLinc module, you would run &quot;x10.plusb.sh stop&quot;.</p>
+<p>The other files in the example_scripts directory are used for automating
+tasks.&nbsp; To make things somewhat flexible, I created links on my system so
+that I could change the devices around without having to rewrite any
+scripts.&nbsp; Here are the commands for setting up the links/aliases:</p>
+<p><font size="1"># mkdir /automation<br>
+# ln -s /dev/x10/e1 /automation/frontflood<br>
+# ln -s /dev/x10/e2 /automation/backflood<br>
+# ln -s /dev/x10/e3 /automation/extbreakfast<br>
+# ln -s /dev/x10/e4 /automation/frontgarage<br>
+# ln -s /dev/x10/e5 /automation/backgarage<br>
+# ln -s /dev/x10/e6 /automation/frontporch<br>
+# ln -s /dev/x10/e7 /automation/backporch<br>
+# ln -s /dev/x10/e8 /automation/extbasement<br>
+# ln -s /dev/x10/e9 /automation/gym<br>
+# ln -s /dev/x10/e10 /automation/foyer<br>
+# ln -s /dev/x10/e11 /automation/familyroom<br>
+# ln -s /dev/x10/e15 /automation/curio<br>
+# ln -s /dev/x10/e16 /automation/lightsensor<br>
+# ln -s /dev/x10/g1 /automation/garagestatus<br>
+# ln -s /dev/x10/g11 /automation/statusgaragedouble<br>
+# ln -s /dev/x10/g12 /automation/statusgaragesingle</font><br>
+<font size="1">
+<br>
+</font>With these links in place, the watcher scripts can be run to
+look for events from the X10 network.&nbsp; This script assumes that everything
+should be off when it starts, and then just continually cycles.&nbsp; It uses
+the utility &quot;nbread&quot; (distributed with the source code and installed
+by default in /usr/bin/) to read the status of the <a href="http://www.smarthome.com/4235.html">Leviton
+Photocell</a>.&nbsp; When it gets dark, the cell sends a 1 on its unitcode and
+when it gets light, it sends a 0.&nbsp;&nbsp;</p>
+<p><font size="1">#!/bin/sh<br>
+#<br>
+dir=&quot;`dirname $0`/"<br>
+device=&quot;/automation/photocell&quot;<br>
+old_status=&quot;   "<br>
+while [ 1 = 1 ]<br>
+do<br>
+&nbsp;&nbsp;&nbsp; status=`nbread $device`<br>
+&nbsp;&nbsp;&nbsp;        if [ "$status" != "$old_status" ]<br>
+&nbsp;&nbsp;&nbsp;        then<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; old_status=&quot;$status&quot;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if [ "$status" = "000" ]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                then<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${dir}action_alloff.sh<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                else<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${dir}action_night.sh on<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                fi<br>
+&nbsp;&nbsp;&nbsp;        fi<br>
+&nbsp;&nbsp;&nbsp;        sleep 10<br>
+done</font></p>
+<p>Another useful script is one that reconfigures the house to turn on the night
+lights and turn off the spotlights.&nbsp; This script is usually run out of cron
+at a specific time of the night.&nbsp; I made this one reversable so that I
+could turn off the lights that were turned on; however, I rarely use it that way
+and instead send &quot;aoff&quot; to the system when the photocell senses light
+in the morning.</p>
+<p><font size="1">#!/bin/sh<br>
+#<br>
+dir=&quot;`dirname $0`/"<br>
+case "$1" in<br>
+&nbsp;&nbsp;&nbsp; on)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        action="on"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ;;<br>
+&nbsp;&nbsp;&nbsp;  off)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        action="off"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ;;<br>
+&nbsp;&nbsp;&nbsp;  *)<br>
+&nbsp;&nbsp;&nbsp;        echo $"Usage: $0 {on|off}"<br>
+&nbsp;&nbsp;&nbsp;        exit 1<br>
+esac<br>
+<br>
+echo $action > /automation/frontflood<br>
+echo $action > /automation/backflood<br>
+echo $action > /automation/extbreafast<br>
+echo $action > /automation/frontgarage<br>
+echo $action > /automation/extbasement<br>
+echo $action > /automation/foyer</font></p>
+<p>If you want to run this out of cron, put something like this in cron by
+editing with &quot;crontab -e -u root&quot;</p>
+<p><font size="1"># sleep time.  Turn off interior lights, and all exterior lights except<br>
+# lights on main entrances at 10:30 each night<br>
+# minute hour dayofmonth month dayofweek command<br>
+30 22 * * * /usr/local/etc/x10/action_sleep.sh</font></p>
+<p>These are 3 really simple ways to take advantage of the X10 network using
+shell scripts.&nbsp;&nbsp;</p>
+<h3><b><a name="programming">More advanced programming</a></b></h3>
+<p>The drivers can be used just like any other device on the system.&nbsp;
+When accessed from a programming language like C, Java, or Perl, the drivers
+also provide the means to send and receive extended data if the transceiver
+supports it.&nbsp; Below is a code fragment for reading/writing extended data to
+the network.&nbsp;&nbsp;</p>
+<p><font size="1">/* write extended data to the line */<br>
+fd = open(&quot;/dev/x10/e&quot;,O_RDWR)<br>
+if (fd &lt; 0){<br>
+&nbsp;&nbsp;&nbsp; fprintf(stderr,&quot;Error opening x10 device\n&quot;);<br>
+&nbsp;&nbsp;&nbsp; exit 1;<br>
+}<br>
+<br>
+/* just turn all lights on for the housecode */<br>
+c=&quot;aon&quot;;<br>
+write(fd,&amp;c,3);</font><br>
+<br>
+<font size="1">
+/* now set the interface into extended data mode.&nbsp; Turns off standard
+interface, and writes data directly to the line */<br>
+mode=X10IOMODE_EXTENDED;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // this is
+defined in x10.h<br>
+ret = ioctl(fd,X10IOCSMODE,&amp;mode)<br>
+if (ret)<br>
+&nbsp;&nbsp;&nbsp; fprintf(stderr,&quot;Transceiver does not support extended
+data mode\n&quot;);<br>
+else {<br>
+&nbsp;&nbsp;&nbsp; c=&quot;this is just random data to put on the line&quot;;<br>
+&nbsp;&nbsp;&nbsp; write(fd,c,strlen(c));<br>
+<br>
+&nbsp;&nbsp;&nbsp; /* we should get our own data back unless some bits were
+dropped */<br>
+&nbsp;&nbsp;&nbsp; len = read(fd,buf,256);<br>
+&nbsp;&nbsp;&nbsp; if (len &gt; 0)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;Received Extended
+Data:&nbsp; %s&quot;,buf);<br>
+<br>
+&nbsp;&nbsp;&nbsp; /* now switch back to standard mode */<br>
+&nbsp;&nbsp;&nbsp; mode=X10IOMODE_STANDARD;<br>
+&nbsp;&nbsp;&nbsp; ioctl(fd,X10IOCSMODE,&amp;mode);<br>
+}<br>
+<br>
+/* if we successfully exited extended data mode, we should be able to turn
+everything off */<br>
+c=&quot;aoff&quot;;<br>
+write(fd,c,4);<br>
+close(fd);</font></p>
+<p>The bit advantage to using a programming language is that you can use
+blocking reads or non-blocking reads as needed to watch the status so that you
+only loop when data is ready.&nbsp; By doing a blocking read, you eliminate the
+need for sleep loops while waiting for an update to the line.&nbsp; For
+instance, a fragment of code that does something similar to the shell script for
+watching the light sensor is:</p>
+<p><font size="1">fd = open(&quot;/automation/lightsensor,O_RDWR);<br>
+status = 0;<br>
+if (fd &lt; 0) {<br>
+&nbsp;&nbsp;&nbsp; fprintf(stderr,&quot;Error opening x10 device\n&quot;);<br>
+&nbsp;&nbsp;&nbsp; exit 1;<br>
+}<br>
+while (1) {<br>
+&nbsp;&nbsp;&nbsp; n = read(inf,line,256);<br>
+&nbsp;&nbsp;&nbsp; if (n &lt; 0) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        printf("Error:  Unable to read %s\n",argv[1]);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        return 1;<br>
+&nbsp;&nbsp;&nbsp;                }<br>
+&nbsp;&nbsp;&nbsp; if (!strcmp(line,&quot;000&quot;))
+{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // new status from light sensor
+indicates it senses light<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; fdtmp=open(&quot;/dev/x10/e&quot;,O_RDWR);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (fdtmp &lt; 0) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+fprintf(stderr,&quot;Error opening /dev/x10/e\n&quot;);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; write(fdtmp,&quot;aoff&quot;,4);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// turn all lights off on housecode E<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; close(fdtmp);<br>
+&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp; else
+{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// new status from light sensor indicates it senses darkness<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; nightlightfd=open(&quot;/automation/foyer&quot;,O_RDWR);&nbsp;&nbsp;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (nightlightfd &lt; 0) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+fprintf(stderr,&quot;Error opening /automation/foyer\n&quot;);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; write(nightlightfd,&quot;on&quot;,2);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; close(nightlightfd);<br>
+&nbsp;&nbsp;&nbsp; }<br>
+        }<br>
+close(fd);</font></p>
+<p>Of course you would want to have better coding style than this, but it takes
+about as much time to write it this way as it takes to write a shell
+script.&nbsp;</p>
+<h3><a name="logs">Activity logs</a></h3>
+<p>The driver also maintains a short circular log of traffic on the network
+which can be captured and decoded to store in a human readable log file.&nbsp;
+All other information is written to the system log the syslogd facility.&nbsp; The actual location of the logs is
+defined in /etc/syslog.conf.&nbsp; All messages are logged to the console by
+default.&nbsp; Below is a description of the classes that the driver uses for
+logging information to the system.</p>
+<p><b>kern.info: </b>this class of information is typically written to the console,
+/var/log/messages, and /var/log/dmesg.&nbsp; This type of information is benign
+data being reported by the driver.&nbsp; At startup the driver will write the
+version of each of the files in the module and indicate that it successfully
+started.&nbsp;&nbsp;</p>
+<p><b>kern.warning</b>: this class of information is typically written to the
+console, /var/log/messages, and /var/log/dmesg.&nbsp; This type of information
+warns of some activity that failed to complete but which is not fatal to the
+driver.&nbsp; Typical uses of the warning messages are when the transceiver
+prematurely stops transmitting data due to a collision on the line.&nbsp; Most
+bi-directional transceivers also require a handshaking protocol for proper
+communications and if that protocol times out while waiting for a message from
+the transceiver, a warning message will be produced.</p>
+<p><b>kern.error</b>: this class of information is typically written to /var/log/messages,
+the console, and /var/log/dmesg.&nbsp; This type of information indicates that a
+catastrophic error has occurred in the driver.&nbsp; As a result, the driver
+will usually try to unload itself.&nbsp; In many cases the driver is unable to
+unload and the driver will be unusable or unstable.&nbsp; It is highly
+recommended that the machine be rebooted to eliminate potential crashes of the
+entire system if the error text indicates an unstable situation.</p>
+<p><b>kern.debug</b>: this class of information is typically written to /var/log/messages,
+the console, and /var/log/dmesg.&nbsp; This information is only generated when
+the debug parameter is passed to the driver.&nbsp; It is recommended that the
+driver not be run with debugging turned on unless you are troubleshooting a
+problem and need to send the output of the driver for analysis.&nbsp; Debugging
+the driver produces an enormous about of data and will quickly fill up system
+log files.</p>
+<p>In addition to the system logs which are written to the hard drive, the
+driver maintains a log in memory.&nbsp; The log is cleared whenever the device driver
+is loaded or unloaded.&nbsp; The daemon can be loaded and unloaded without 
+clearing the log or status of the X10 devices.&nbsp; The log contains all transactions that occur on the
+X10 network as well as the virtual status of all devices on the network.&nbsp;
+As noted in the <a href="#FAQ">FAQ</a>, the virtual status is an approximation
+and assumes that every device is a light.&nbsp; </p>
+<p><b>Status of individual X10 Units</b>:&nbsp; Every command that is received
+by the driver is used to update an array holding the last known status of the
+units in the X10 network.&nbsp; Each individual status can be retrieved by
+reading <b>/dev/x10/&lt;housecode&gt;&lt;unitcode&gt;</b>.&nbsp; The result will
+be a number between 0 and 100 inclusive indicating the lighting level.&nbsp;
+Since most X10 devices are unidirectional, there is no way to know the actual
+status of a light.&nbsp; If two-way X10 devices re present on the network, the
+command &quot;<i>echo status &gt; /dev/x10/&lt;housecode&gt;&lt;unitcode&gt;</i>&quot;
+to request that the unit send an message to update its status.&nbsp; The driver
+assumes that every device supports all commands; therefore, if a unit doesn't
+support a command (e.g. a wall receptacle doesn't support dim and bright) the
+protocol simulator will not be aware of the limitation and will update the
+status as if it were supported.&nbsp; Note that by default reading an individual
+unit will block unless opened in O_NONBLOCK mode.&nbsp; As a result, programs
+such as &quot;cat&quot; will continue to read the status and whenever the status
+changes, the cat program will show the new change.&nbsp;&nbsp;</p>
+<p><b>Status of all 16 units in a housecode</b>:&nbsp; In anticipation that
+scripts or programs will be used to create a GUI for managing the
+X10 network, the drivers provide the ability for all 16 units of a housecode to
+be read in one call.&nbsp; The format of the output depends on the device..&nbsp; If <b>/dev/x10/&lt;housecode&gt;</b> is read, the result will be a
+header row followed by a data row with 16 entries that align with the header
+row.&nbsp; Each entry will be 3 characters separated by a space.&nbsp; If <b>/dev/x10/&lt;housecode&gt;raw</b>
+is read, the result will be 16 data entries without a header row.&nbsp; As with
+the individual units, reading a housecode or a raw housecode will block unless
+the device is opened with O_NONBLOCK.&nbsp; &quot;<a href="#nbread">nbread</a>&quot; can be used by
+scripts to read the status without blocking.&nbsp;For example, to display the 
+status of housecode &quot;e&quot; without headers, execute the command &quot;cat /dev/x10/eraw&quot;.</p>
+<p><b>Status of all 256 X10 units</b>:&nbsp; Most transceivers monitor the
+entire network and capture every activity for all 256 possible units.&nbsp;
+Anticipating that a GUI could benefit from the speed of reading the status of
+all units at the same time, the driver will provide a snapshot of the entire
+status matrix.&nbsp; As with reading a housecode, all 256 units can be read with
+or without a header.&nbsp; If <b>/dev/x10/status</b> is read, the result will be
+a 16x16 matrix of 3 digit numbers with a header row indicating the unit for the
+column and a header column to indicate the housecode for the row.&nbsp; If <b>/dev/x10/statusraw</b>
+is read, the same results will be returned without the header row and header
+column.&nbsp;&nbsp;</p>
+<p><b>Traffic log</b>:&nbsp; Whiles the driver attempts to maintain a virtual status of
+the X10 network, the logic for the status updates makes assumptions about the
+features of devices.&nbsp; For flexibility, the driver also maintains a circular
+log of all commands received from the network.&nbsp; Each event is also
+timestamped with a double long value representing the time value in
+seconds.&nbsp; This number can be imported directly into a userspace program and
+stuffed into a timeval structure to use standard library routines to manipulate
+the time.&nbsp; The log is accessed through <b>/dev/x10/log</b>.&nbsp; The log 
+file can be read in both blocking and nonblocking modes.&nbsp; The format of the data in the log follows the
+following 3 formats:</p>
+<ul>
+  <li><b><i>&lt;timestamp&gt; &lt;dir&gt; &lt;housecode&gt;&lt;unitcode&gt;</i></b> - X10
+    unit address packet.&nbsp; &lt;timestamp&gt; is the number of seconds since
+    epoch.&nbsp; &lt;dir&gt; is the direction and will be either &quot;T&quot;
+    for transmit or &quot;R&quot; for receive.&nbsp; The data will be capitalized.&nbsp; For example,
+    if a the address for A1 is transmitted on the network, the log will show
+    &quot;0123456789 T A1&quot;.&nbsp;&nbsp;Similarly, if E15 is received from
+    the network, the log will show &quot;0123456789 R E15&quot;.</li>
+  <li><b><i>&lt;timestamp&gt; &lt;dir&gt; &lt;housecode&gt; &lt;functioncode&gt;</i></b> -
+    X10 command packet.&nbsp; &lt;timestamp&gt; is the number of seconds since
+    epoch.&nbsp; &lt;dir&gt; is the direction and will be either &quot;T&quot;
+    for transmit or &quot;R&quot; for receive.&nbsp; The data will be capitalized. For example,
+    if the ON
+    command is sent to devices addressed on housecode A, the following will show
+    in the log:&nbsp; &quot;0123456789 T A ON&quot;.&nbsp; Note that there is a
+    space between the housecode and the functioncode.&nbsp; The following table
+    lists the valid commands that can appear for the functioncode:<br>
+    <table border="0">
+      <tr>
+        <td>Function</td>
+        <td>Text</td>
+      </tr>
+      <tr>
+        <td valign="top">ALL_LIGHTS_ON</td>
+        <td>Turns on all X10 devices on a single housecode that fall into the
+          category of &quot;light&quot;.&nbsp; Devices such as wall outlets or
+          relays will not respond to this command.&nbsp;&nbsp;</td>
+      </tr>
+      <tr>
+        <td valign="top">ALL_LIGHTS_OFF</td>
+        <td>Turns off all X10 devices on a single housecode that fall into the
+          category of &quot;light&quot;.&nbsp; Devices such as wall outlets or
+          relay controller generally do not respond to this command.</td>
+      </tr>
+      <tr>
+        <td valign="top">ON</td>
+        <td>Turns a device on.&nbsp; All X10 devices respond to this command.</td>
+      </tr>
+      <tr>
+        <td valign="top">OFF</td>
+        <td>Turns a device off.&nbsp; All X10 devices respond to this command.</td>
+      </tr>
+      <tr>
+        <td valign="top">DIM</td>
+        <td>Dim the X10 device by 1/16.&nbsp; Not all X10 devices respond to this
+          command.&nbsp; Fluorescent lighting, wall outlets, and relay controls
+          are examples of devices that do not respond to this command.</td>
+      </tr>
+      <tr>
+        <td valign="top">BRIGHT</td>
+        <td>Brighten the X10 device by 1/16.&nbsp; Not all X10 devices respond to
+          this command.&nbsp; Fluorescent lighting, wall outlets, and relay
+          controls are examples of devices that do not respond to this command.</td>
+      </tr>
+      <tr>
+        <td valign="top">EXTENDED_CODE</td>
+        <td>Currently not supported in the drivers.&nbsp; This is used to allow
+          non-standard codes to be put on the line to allow new devices that
+          aren't specifically supported by the standard to be managed.</td>
+      </tr>
+      <tr>
+        <td valign="top">HAIL_REQUEST</td>
+        <td>This command allows a transceiver to send a request for other
+          transmitters to identify themselves.&nbsp; The driver takes no action
+          when this command is received.&nbsp; A user space program should
+          intercept this command and send a HAIL_ACKNOWLEDGE if implementing the
+          hail protocol.</td>
+      </tr>
+      <tr>
+        <td valign="top">HAIL_ACKNOWLEDGE</td>
+        <td>This command is sent in response to a HAIL_REQUEST to implement the
+          hail protocol.&nbsp; The driver does not take Action on this
+          command.&nbsp; A user space program should intercept and implement the
+          hail protocol if desired.</td>
+      </tr>
+      <tr>
+        <td valign="top">PRESETDIMHIGH</td>
+        <td>Used to dim or brighten a light to a specific dim level.&nbsp; The
+          level is determined by the housecode that is sent with the preset
+          command.&nbsp; The protocol simulator will properly update the status
+          to reflect the dim level set for the unit.&nbsp;&nbsp;</td>
+      </tr>
+      <tr>
+        <td valign="top">PRESETDIMLOW</td>
+        <td>Used to dim or brighten a light to a specific dim level.&nbsp; The
+          level is determined by the housecode that is sent with the preset
+          command.&nbsp; The protocol simulator will properly update the status
+          to reflect the dim level set for the unit.</td>
+      </tr>
+      <tr>
+        <td valign="top">EXTENDED_DATA</td>
+        <td>Only the Powerlinc Serial driver supports this function at this
+          time.&nbsp; This function is used to allow non-standard data to be put
+          on the X10 line for communication with devices that were not
+          anticipated when the protocol was written.</td>
+      </tr>
+      <tr>
+        <td valign="top">STATUS=ON</td>
+        <td>This command is typically sent by a two-way X10 device in response
+          to a STATUS request to indicate that the device is currently on.&nbsp;
+          The driver supports sending and receiving this command.</td>
+      </tr>
+      <tr>
+        <td valign="top">STATUS=OFF</td>
+        <td>This command is typically sent by a two-way X10 device in response
+          to a STATUS request to indicate that the device is currently
+          off.&nbsp; The driver supports sending and receiving this commnd.</td>
+      </tr>
+      <tr>
+        <td valign="top">STATUS</td>
+        <td>This command is transmitted by a device to request that an X10
+          device respond with its current status.&nbsp; Only two-way devices
+          support this command.</td>
+      </tr>
+    </table>
+  </li>
+</ul>
+<h3><a name="utilities">Utilities</a></h3>
+<p>The distribution also includes utilities that enhance the use of the drivers.&nbsp; 
+These are listed below and described in detail.</p>
+<p><b><a name="x10logd">X10 Log Daemon</a>:&nbsp; (run this as root or a
+priveledged user that can write to syslog)&nbsp;</b></p>
+<p><b>x10logd</b> is a utility has been provided to read the log file and write its
+contents to a file with the timestamp decoded.&nbsp; The utility is installed by default in <b>/usr/sbin/x10logd</b>
+and loaded by automatically if one of the scripts from example_scripts is used
+to start the drivers.&nbsp; The default parameters for x10logd are debug=off,
+x10log=/dev/x10/log, log file=/var/log/x10.log, and pid file=/var/run/x10logd.pid.&nbsp;
+Each of these are changed via flags when x10logd is started.&nbsp; The format
+of the output for x10logd is as follows:<br>
+<br>
+&lt;month&gt; &lt;day of month&gt; &lt;hh:mm:ss&gt; &lt;hostname&gt; &lt;T/R&gt;
+&lt;X10 activity&gt;</p>
+<ul>
+  <li>&lt;month&gt;:&nbsp; 3 letters representing the month of the year.&nbsp;
+    Jan, Feb, Mar, Apr, etc.</li>
+  <li>&lt;day of month&gt;: 1 or 2 digits representing the day of the month. 1,
+    2, 3, 4, etc.</li>
+  <li>&lt;hh:mm:ss&gt;: Time that the message was received from the network in
+    the form of hours:minutes:seconds.</li>
+  <li>&lt;hostname&gt;:&nbsp; The hostname of the machine that captured the X10
+    log</li>
+  <li>&lt;T/R&gt;:&nbsp; Flag indicating Transmit or Received data.&nbsp; T
+    means that fakereceive=1 and the data was transmitted by the driver.&nbsp; R
+    means that the driver received it from the X10 network.</li>
+  <li>&lt;X10 activity&gt;:&nbsp; This is identical to the address and
+    functioncode described in the preceding text.</li>
+</ul>
+<p>The arguments to x10logd are:</p>
+<ul>
+  <li><b>-o</b>: specify log output file name, default=/var/log/x10log if -s is not
+    specified&nbsp;</li>
+  <li><b>-i:</b> specify x10 log source device, default=/dev/x10/log&nbsp;</li>
+  <li><b>-d</b>: debug -p: specify pid file, default=/var/run/x10logd.pid&nbsp;</li>
+  <li><b>-a</b>: start at beginning of device log (default=start logging only what is
+    received after x10logd starts)&nbsp;</li>
+  <li><b>-s</b>: log output to syslog</li>
+  <li><b>-t &lt;tag&gt;:</b>&nbsp; Prepend each log entry with a tag</li>
+</ul>
+<p>If -s is specified, and -o is not specified, all logging will go to syslog
+and show up as local5.*.&nbsp; If -o is specified and -s is not specified, then
+all logging will go to the specified -o file.&nbsp; If neither -s nor -o are
+specified, then logging will go to the default of /var/log/x10log.&nbsp; If both
+-o and -s are specified, then logging will go to both the syslog and the
+specified -o file.</p>
+<p><b><a name="nbread">Non-Blocking Read Utility</a>:&nbsp;&nbsp;</b></p>
+<p><b>nbread</b> is a utility to allow a shell script to read the
+status of a device and immediately return the data from the device in the form 
+of a string.&nbsp; This utility is in the utils/ directory
+and is installed as <b>/usr/bin/nbread</b> if the installation script is used.&nbsp; &quot;nbread&quot;
+simply accepts the name of the file to read and will read until there is no more
+data.&nbsp; It will return all data to the script and then exit.&nbsp; If
+nothing else, the source code to &quot;nbread&quot; provides an example of how
+to read without blocking.</p>
+<p>The arguments to nbread are:</p>
+<ul>
+  <li>device name to read</li>
+</ul>
+<p><b><a name="nbecho">Non-Blocking Echo Utility</a>:&nbsp;&nbsp;</b></p>
+<p><b>nbecho</b> is a utility to send text to a file (or standard output) with 
+the O_NONBLOCK flag set.&nbsp; This utility is intended to be identical in 
+function to &quot;echo&quot; but does not block.&nbsp; The use would be to allow a shell 
+script to send many commands to the X10 network without waiting for the commands 
+to spool out to the network.&nbsp; This utility is in the utils/ directory
+and is installed as <b>/usr/bin/nbecho</b> if the installation script is used.&nbsp; &quot;nbecho&quot;
+simply echos whatever is passed as a parameter to standard output which can be 
+redirected to a file.&nbsp;&nbsp; If
+nothing else, the source code to &quot;nbecho&quot; provides an example of how
+to write without blocking.</p>
+<p>The arguments to nbecho are:</p>
+<ul>
+  <li>text to echo</li>
+</ul>
+<p><b><a name="x10watch">X10 Watch Utility</a>:</b></p>
+<p>x10watch is a utility that will watch an individual x10 device and take action
+when the device changes state.&nbsp; This utility effectively does
+exactly what a macro would do for the CM11A.&nbsp; Note that the program
+considers anything that is not OFF to be on.&nbsp; For example, preset dim 1 is
+the same as on since the status indicator will be non-zero for the device.&nbsp;
+This utility should be run as a user that has access to write to the X10 devices
+and <b>should not be run as root</b> since it takes action by calling system().</p>
+<p>The syntax to x10watch is:&nbsp; <b>x10watch &lt;device&gt; [-0 &lt;action
+off&gt;] [-1 &lt;action on&gt;] [-t &lt;tag&gt;] [-p &lt;seconds&gt;]</b></p>
+<p>The arguments to x10watch are:</p>
+<ul>
+  <li><b>&lt;device&gt;:</b>&nbsp; The device to watch.&nbsp; It must be a
+    single unit and must be specified for the program to run.</li>
+  <li><b>-0 &lt;action off&gt;</b>:&nbsp; (note it is a zero) This argument is
+    optional and identifies the command to execute when the device changes from
+    an on state to an off state.&nbsp; You must specify at least one action
+    argument.&nbsp;</li>
+  <li><b>-1 &lt;action on&gt;:&nbsp;</b> (note it is a one) This argument is
+    optional and identifies the command to execute when the device changes from
+    an off state to an on state.&nbsp; You must specify at least one action
+    argument.</li>
+  <li><b>-p &lt;seconds&gt;</b>:&nbsp; Number of seconds to delay after each
+    action.&nbsp; This is intended to allow for debouncing or for delaying to
+    keep a light on for a time period after an event occurs.</li>
+</ul>
+<p>This utility should not be run as root.&nbsp; To run as a less priveledged
+user from root scripts, use &quot;su -c&quot; to run the program.&nbsp; For
+example, the following could be put into a script to start up x10watch:&nbsp; <b>su whiles -c '/usr/bin/x10watch /dev/x10/e10 -0 "echo 0 > /dev/x10/e15" -1 "echo 1 > /dev/x10/e15" -d'</b></p>
+<p>The action arguments can specify anything that you could type at the command
+line and are passed to a shell for execution.&nbsp; The following are valid
+action commands:</p>
+<ol>
+  <li>x10watch /dev/x10/a1 -0 &quot;echo aoff &gt; /dev/x10/e&quot; -1
+    &quot;echo aon &gt; /dev/x10/e&quot;</li>
+  <li>x10watch /dev/x10/a1 -0 /usr/local/etc/x10_alloff.sh</li>
+  <li>x10watch /dev/x10/a1 -1 /usr/local/etc/x10_allon.sh</li>
+</ol>
+<p>1) This one watches device A1 and if it goes from on to off, it will turn all
+lights off for housecode e.&nbsp; If it goes from off to on, it will turn all
+lights on for housecode e.<br>
+2) This one watches device A1, and will execute /usr/local/etc/x10_alloff.sh if
+A1 transitions from on to off.&nbsp; It will take no action when A1 transitions
+from off to on<br>
+3) This one watches device A1, and will execute /usr/local/etc/x10_allon.sh if
+A1 transitions from off to on.&nbsp; It will take no action when A1 transitions
+from on to off.</p>
+<p>Why use x10watch instead of nbread in a shell script?&nbsp; It is a bit
+cleaner of an implementation of the same functionality that the example scripts
+provide but it has the advantage that it never has to enter a sleep cycle.&nbsp;
+It simply uses a blocking read to read the status of the x10 device.&nbsp; If
+the status never changes, the program never takes action and takes very little
+system overhead.&nbsp; This program was actually written because I was watching
+my system and noticed that whenever my scripts ran the hard drive light would
+blink as the nbread command opened the device file.&nbsp; By opening the file
+once when the program starts, it does not cause any disk activity when it is
+actually reading the data.</p>
+<hr>
+<h1 align="center"><b><a name="TechnicalDetails">Technical Details</a></b></h1>
+<p>This section is going to talk about the technical details of how the code is
+written and how the X10 protocol works.&nbsp; Only read this section if you are
+interested in writing code for a transceiver or you are trying to debug what is
+happening.&nbsp; The details will start with a <a href="#deventries">generic
+look at the environment</a> for the drivers and how it relates to the X10
+protocol.&nbsp; The details will then dig into how <a href="#filelayout">the 3
+files for each driver</a> fit together.</p>
+<h3><b><a name="deventries">/dev/x10 entries</a></b></h3>
+<p>For each device on the X10 network, each housecode, and the entire
+network, character devices are created in the /dev/x10 directory.&nbsp; The major
+and minor numbers for the devices communicate with dev.c which creates the
+generic interface.&nbsp; All individual units are controlled by a single major
+character device.&nbsp;&nbsp; The default is 120.&nbsp; To access the housecodes
+without the specific units, a second major character device is used.&nbsp; The
+default is 121.&nbsp;&nbsp;</p>
+<p>Access to the individual units is done through the data_major
+device.&nbsp; The default major number for this device is 120.&nbsp; The
+housecode is encoded into the upper nibble of the minor number and the unitcode
+is encoded into the lower nibble of the minor number.&nbsp; While X10 references
+the unitcodes as 1 through 16, to make things more Unix like, the unitcodes are
+mapped as 0 through 15.&nbsp; Following is a table with the mapping of the
+housecodes and unitcodes.</p>
+<table border="1" width="66%">
+  <tr>
+    <td width="16%"><b>Housecode</b></td>
+    <td width="33%"><b>upper nibble</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>Unitcode</b></td>
+    <td width="32%"><b>lower nibble</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>A</b></td>
+    <td width="33%"><b>0000 0000 (0x00)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>1</b></td>
+    <td width="32%"><b>0000 0000 (0x00)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>B</b></td>
+    <td width="33%"><b>0001 0000 (0x10)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>2</b></td>
+    <td width="32%"><b>0000 0001 (0x01)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>C</b></td>
+    <td width="33%"><b>0010 0000 (0x20)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>3</b></td>
+    <td width="32%"><b>0000 0010 (0x02)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>D</b></td>
+    <td width="33%"><b>0011 0000 (0x30)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>4</b></td>
+    <td width="32%"><b>0000 0011 (0x03)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>E</b></td>
+    <td width="33%"><b>0100 0000 (0x40)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>5</b></td>
+    <td width="32%"><b>0000 0100 (0x04)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>F</b></td>
+    <td width="33%"><b>0101 0000 (0x50)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>6</b></td>
+    <td width="32%"><b>0000 0101 (0x05)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>G</b></td>
+    <td width="33%"><b>0110 0000 (0x60)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>7</b></td>
+    <td width="32%"><b>0000 0110 (0x06)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>H</b></td>
+    <td width="33%"><b>0111 0000 (0x70)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>8</b></td>
+    <td width="32%"><b>0000 0111 (0x07)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>I</b></td>
+    <td width="33%"><b>1000 0000 (0x80)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>9</b></td>
+    <td width="32%"><b>0000 1000 (0x08)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>J</b></td>
+    <td width="33%"><b>1001 0000 (0x90)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>10</b></td>
+    <td width="32%"><b>0000 1001 (0x09)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>K</b></td>
+    <td width="33%"><b>1010 0000 (0xa0)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>11</b></td>
+    <td width="32%"><b>0000 1010 (0x0a)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>L</b></td>
+    <td width="33%"><b>1011 0000 (0xb0)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>12</b></td>
+    <td width="32%"><b>0000 1011 (0x0b)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>M</b></td>
+    <td width="33%"><b>1100 0000 (0xc0)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>13</b></td>
+    <td width="32%"><b>0000 1100 (0x0c)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>N</b></td>
+    <td width="33%"><b>1101 0000 (0xd0)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>14</b></td>
+    <td width="32%"><b>0000 1101 (0x0d)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>O</b></td>
+    <td width="33%"><b>1110 0000 (0xe0)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>15</b></td>
+    <td width="32%"><b>0000 1110 (0x0e)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>P</b></td>
+    <td width="33%"><b>1111 0000 (0xf0)</b></td>
+    <td width="4%">&nbsp;</td>
+    <td width="21%"><b>16</b></td>
+    <td width="32%"><b>0000 1111 (0x0f)</b></td>
+  </tr>
+</table>
+<p>As a result, the A1 is minor 0x00 or 0, A2 is minor 0x01 or 1, B1 is minor
+0x10 or 16, and B4 is 0x13 or 19.</p>
+<p><b>Housecodes, status, and control interface:&nbsp; </b>The control interface provides additional access beyond the individual
+units on the house.&nbsp; The encoding of the minor code depends on the function
+being accessed.&nbsp; The upper nibble is the action and the lower nibble is the
+target.&nbsp;&nbsp;</p>
+<p>Housecode control:&nbsp; Commands can be sent to all units on a housecode or a subset of the units
+on the housecode.&nbsp; Further, the status of the entire housecode can be read
+in both a raw format and a prettier format which includes headers.&nbsp; The
+upper nibble (action) identifies if headers are to be displayed and the lower
+nibble (target) specifies the actual housecode as follows:</p>
+<table border="1" width="63%">
+  <tr>
+    <td width="16%"><b>action</b></td>
+    <td width="32%"><b>upper nibble</b></td>
+    <td width="3%">&nbsp;</td>
+    <td width="26%"><b>target</b></td>
+    <td width="29%"><b>lower nibble</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>header</b></td>
+    <td width="32%"><b>0000 0000 (0x00)</b></td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>A</b></td>
+    <td width="29%"><b>0000 0000 (0x00)</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>no header</b></td>
+    <td width="32%"><b>0001 0000 (0x10)</b></td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>B</b></td>
+    <td width="29%"><b>0000 0001 (0x01)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>C</b></td>
+    <td width="29%"><b>0000 0010 (0x02)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>D</b></td>
+    <td width="29%"><b>0000 0011 (0x03)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>E</b></td>
+    <td width="29%"><b>0000 0100 (0x04)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>F</b></td>
+    <td width="29%"><b>0000 0101 (0x05)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>G</b></td>
+    <td width="29%"><b>0000 0110 (0x06)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>H</b></td>
+    <td width="29%"><b>0000 0111 (0x07)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>I</b></td>
+    <td width="29%"><b>0000 1000 (0x08)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>J</b></td>
+    <td width="29%"><b>0000 1001 (0x09)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>K</b></td>
+    <td width="29%"><b>0000 1010 (0x0a)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>L</b></td>
+    <td width="29%"><b>0000 1011 (0x0b)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>M</b></td>
+    <td width="29%"><b>0000 1100 (0x0c)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>N</b></td>
+    <td width="29%"><b>0000 1101 (0x0d)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>O</b></td>
+    <td width="29%"><b>0000 1110 (0x0e)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>P</b></td>
+    <td width="29%"><b>0000 1111 (0x0f)</b></td>
+  </tr>
+</table>
+<p>If /dev/x10/e is mapped to minor code 0x04 (4), the following command will
+result in the shown output:</p>
+<p>$cat /dev/x10/e<br>
+<font face="Courier New">&nbsp;&nbsp;&nbsp; 1&nbsp;&nbsp; 2&nbsp;&nbsp; 3&nbsp;&nbsp;
+4&nbsp;&nbsp; 5&nbsp;&nbsp; 6&nbsp;&nbsp; 7&nbsp;&nbsp; 8&nbsp;&nbsp; 9&nbsp;&nbsp;
+10&nbsp; 11&nbsp; 12&nbsp; 13&nbsp; 14&nbsp; 15&nbsp; 16<br>
+E: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000</font></p>
+<p>Similarly if /dev/x10/eraw is mapped to minor code 0x14 (20), the following
+command will result in the shown output:</p>
+<p>$cat /dev/x10/eraw<br>
+<font face="Courier New">000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000</font></p>
+<p>Status control:&nbsp; The upper nibble of the minor number is set to 0x02 to get the status of
+all housecodes and units in the X10 network.&nbsp; The lower nibble specifies
+what status is returned and the format.&nbsp; The rightmost bit specifies
+whether headers are to be added.&nbsp; The second bit from the right specifies
+if it is to be the actual value (percent from 0 to 100) or just the change
+status.&nbsp; This is summarized as follows:</p>
+<table border="1" width="63%">
+  <tr>
+    <td width="16%"><b>action</b></td>
+    <td width="32%"><b>upper nibble</b></td>
+    <td width="3%">&nbsp;</td>
+    <td width="26%"><b>target</b></td>
+    <td width="29%"><b>lower nibble</b></td>
+  </tr>
+  <tr>
+    <td width="16%"><b>status</b></td>
+    <td width="32%"><b>0010 0000 (0x20)</b></td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>value wo/hdr</b></td>
+    <td width="29%"><b>0000 0000 (0x00)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>value w/hdr</b></td>
+    <td width="29%"><b>0000 0001 (0x01)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>change wo/hdr</b></td>
+    <td width="29%"><b>0000 0010 (0x02)</b></td>
+  </tr>
+  <tr>
+    <td width="16%">&nbsp;</td>
+    <td width="32%">&nbsp;</td>
+    <td width="3%">&nbsp;</td>
+    <td width="16%"><b>chane w/hdr</b></td>
+    <td width="29%"><b>0000 0011 (0x03)</b></td>
+  </tr>
+</table>
+<p>If the device /dev/x10/status is mapped to minor number 0x20 (32), the
+following command results in the associated output:</p>
+<p>$ cat /dev/x10/status<br>
+<font face="Courier New">&nbsp;&nbsp;&nbsp; 1&nbsp;&nbsp;   2&nbsp;&nbsp;   3&nbsp;&nbsp;   4&nbsp;&nbsp;   5&nbsp;&nbsp;   6&nbsp;&nbsp;   7&nbsp;&nbsp;   8&nbsp;&nbsp;   9&nbsp;&nbsp;   10&nbsp;  11&nbsp;  12&nbsp;  13&nbsp;  14&nbsp;  15&nbsp;  16<br>
+A: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+B: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+C: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+D: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+E: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+F: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+G: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+H: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+I: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+J: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+K: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+L: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+M: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+N: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+O: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000<br>
+P: 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000 000</font></p>
+<p>When the /dev/x10/change device is read, the table shows a 1 for every
+device that has been changed since the last status of that device was
+read.&nbsp; When the status of a device is read through a single unit, a
+housecode, or the status device, the change status is reset to 0.&nbsp; This
+allows a user program to know what devices have changed since the last time the
+data was read.</p>
+<h3><a name="filelayout">Driver File Layout</a></h3>
+<p>The device driver module is comprised of 2 files. The individual files
+provide a level of abstraction for a particular function as defined in the
+following description.</p>
+<ul>
+  <li>dev.c:&nbsp; Creates the /dev/x10/* character devices, the command 
+	processing, activity logging, and userspace API queueing. This file contains 
+	the module __init() function which calls the initialization functions for 
+	the other two files.&nbsp; The data for the log is actually stored as 32 bit 
+	entries which are broken into 8 byte fields in a structure.&nbsp; The log 
+	takes up little space in memory and is expanded to a readable format 
+	whenever it is read from the device driver.</li>
+  <li>strings.c:&nbsp; Parses strings passed to the device files to generate 
+	commands to the API queues.&nbsp; The strings processor is also used to 
+	create the text for displaying the log.&nbsp; </li>
+</ul>
+<h3><a name="filelayout0">Daemon File Layout</a></h3>
+<p>The daemons for each transceiver are comprised of 2 source files.&nbsp; The 
+individual files provide isolate the protocol simulator from the transceiver 
+management interface.&nbsp; The protocol simulator requires that the transceiver 
+management interface conform to a specific API so that the simulator does not 
+have to be modified when a transceiver is added.&nbsp; The following is a 
+description of the individual files:</p>
+<ul>
+	<li>main.c:&nbsp; This is the protocol simulator and contains the main() 
+	function as well as the code to detach the program, launch the receiver 
+	thread, and start up the transceiver.&nbsp; It expects the transceiver code 
+	to contain an xmit_init() function which is expected to connect to the 
+	transceiver, initialize the device, and fill in a structure with a pointer 
+	to the function used to transmit.&nbsp; An argument is passed to the 
+	xmit_init() function which contains a callback routine for the receiver to 
+	call whenever a command has been received.&nbsp; The protocol simulator 
+	requires that the transceiver interface pass normalized values representing 
+	the standard x10 protocol. It is up to the transceiver interface to 
+	translate the native information into the normalized data.</li>
+	<li>&lt;transceiver&gt;_xcvr.c:&nbsp; Each transceiver will have a unique file 
+	associated with it.&nbsp; The file must have a function called xmit_init() 
+	and will receive a single parameter which contains a pointer to a memory 
+	structure with information needed for initialization.&nbsp; This information 
+	includes the unix device name for the transceiver (e.g. /dev/ttyS0, /dev/usb/hiddev0, 
+	/dev/modem, etc.).&nbsp; The transceiver interface has the responsibility of 
+	conforming to the protocol of the hardware transceiver and translating the 
+	hardware protocol to the normalized X10 protocol required by main.c.</li>
+</ul>
+<hr>
+<h2 align="center"><a name="Limitations">Limitations</a></h2>
+<p>Below are the transceivers and the support limitations that I have with
+the drivers for each:</p>
+<p><b>PowerLinc Serial:&nbsp;&nbsp;</b></p>
+<ul>
+  <li>Does not support EXTENDEDCODE.</li>
+	<li>Does not support EXTENDEDDATA</li>
+</ul>
+<p><b>CM11A:&nbsp;&nbsp;</b></p>
+<ul>
+  <li>Macros - Macro functionality is not supported.&nbsp; It is ignored on
+    decode.&nbsp; Macros are a nifty feature, but the intention of the WiSH
+    project is to have the PC listen and react to the network through
+    scripts.&nbsp; Everything that the Macros do in the CM11A can be done by
+    listening to the status of the transceiver and reacting to it in
+    scripts.&nbsp;&nbsp;</li>
+  <li>Timers - Managing the timer of the CM11A is not supported.&nbsp; The
+    CM11A can have timers run to perform events; however, the intention of
+    making a driver for scripting is to let you run the timers from something
+    like cron.&nbsp;&nbsp;</li>
+  <li>Dimming in the headercode - This is a special feature of the
+    CM11A.&nbsp; The device interface uses the DIM and BRIGHT function code to
+    explicitly accomplish the same thing since it is required by the
+    protocol.&nbsp; The dimming in the headercode is not decoded by the driver.</li>
+  <li>Extended Transmissions - The extended transmissions of the CM11A are
+    not supported.&nbsp; This is different from the Extended function which is
+    part of the standard protocol.&nbsp; The extended transmissions are also not
+    decoded.</li>
+  <li>Does not support EXTENDEDCODE</li>
+  <li>Will not receive EXTENDEDDATA.</li>
+</ul>
+<p><b>Firecracker (CM17A):</b></p>
+<ul>
+  <li>Unsupported</li>
+</ul>
+<p><b>USB PowerLinc:</b></p>
+<ul>
+  <li>Does not support EXTENDEDCODE.</li>
+	<li>Does not support EXTENDEDDATA</li>
+</ul>
+<p><b>TW523:</b></p>
+<ul>
+  <li>Unsupported:&nbsp; I have written the drivers up but have been unable
+    to get a serial cable to work properly.</li>
+</ul>
+<p><b>CM10:</b></p>
+<ul>
+  <li>Unsupported:&nbsp; This is very similar to the CM11A. <i>(Thanks to Dave
+    Houston for this information) </i>The only difference between the
+    CM10 and CM11 is that the CM10 has no EEPROM/RTC. The only coding difference
+    is in the response to the POWER_FAIL poll. You need to send a dummy string
+    of 0x00 bytes in response to &quot;set&quot; the RTC. I think it's 0xFB
+    followed by 42 0x00 bytes. The exact details are in my VB example code for
+    the CM11A.<br>
+  </li>
+</ul>
+<hr>
+<p align="center"><b><a name="Download">Revision Log</a></b></p>
+
+<p>Click <a href="http://sourceforge.net/projects/wish">here</a> to go to the
+sourceforge download project page to download the latest version.</p>
+
+<p>Other revisions:</p>
+
+<ul>
+  <li>Version 2.0 alpha 1<ul>
+  <li>Support for the PowerLinc Serial, CM11A, and PowerLinc USB (via HID) only</li>
+	<li>blocking and non-blocking on all /dev/x10 devices</li>
+</ul>
+  </li>
+</ul>
+<hr>
+<h1 align="center">To Do List</h1>
+<ul>
+  <li>Move logging functionality to /proc</li>
+  <li>Add ability to save current state/log and be able to restore it from
+    userspace</li>
+	<li>Get CM17A drivers working</li>
+	<li></li>
+</ul>
+<hr>
+<h1 align="center"><a name="Author">Contacting the author</a></h1>
+<p>My contact information is:</p>
+<p><b><a href="mailto:wsh@sprintmail.com">wsh@sprintmail.com</a></b></p>
+<p>I am happy to answer questions regarding problems compiling and using the
+drivers. I am also happy to help explain the X10 protocol and how to use the
+drivers to manage the X10 network.&nbsp; I am fully open to suggestions on how
+to improve the drivers but I may not accept all suggestions.&nbsp; Please do not
+be offended or insulted if your suggestion is not incorporated.&nbsp; Please
+read the <a href="#FAQ">Frequently Asked Questions (FAQ)</a> prior to sending a
+request.&nbsp; Also, at
+times the email can become overwhelming, so do not be insulted if it takes me
+time to respond to requests.&nbsp; Bug reports will always get the highest
+priority.&nbsp;&nbsp;</p>
+<p>This project is hosted on Sourceforge and has the following resources:</p>
+<ul>
+  <li><a href="http://sourceforge.net/projects/wish">Mail list</a></li>
+  <li><a href="http://sourceforge.net/projects/wish">Homepage</a></li>
+  <li><a href="http://sourceforge.net/projects/wish">Project Summary Page</a></li>
+</ul>
+<p>Enjoy!</p>
+<p>Scott Hiles</p>
+<hr>
+<h1 align="center"><b><a name="Evolution">Evolution</a></b></h1>
+
+<p>This section is provided to give some background on how the drivers came to
+be and how they evolved to where they are today.&nbsp;&nbsp;</p>
+
+<p>Development of this concept required three important events.&nbsp;</p>
+<p>1)&nbsp; First was a very good program called <a href="http://www.heyu.org">heyu</a>
+which created a command line type of interface to allow the user to control a
+CM11A transceiver.&nbsp; As good as the program was, it had some problems for me
+personally because it only supported the CM11A unit and I had a handfull of
+PowerLinc transceivers.&nbsp; I could have modified heyu to support the
+PowerLinc, but other events sent me in a different
+direction.</p>
+<p>2) Second was a file system concept created by Dr. Pete Whiting.&nbsp; Dr. Whiting had
+a CM17A but didn't have drivers for Linux.&nbsp; Being the Linux guru that he is,
+he created a hardware device driver that mapped the X10 units to /dev entries.&nbsp; Each /dev
+entry represented an X10 unit on the network and could accept commands which
+would be transmitted through the transceiver.&nbsp;&nbsp;</p>
+<p>3) Third was the joystick/mouse abstraction created by Vojtech Pavlik
+which is included in the kernel distributions in the devices/input/* area.&nbsp;
+I came upon this concept after asking for advice on a newsgroup for how to
+connect to the serial.c drivers someone suggested that I look into the way that
+Vajtech Pavlik had used the tty line discipline to abstract the joystick.&nbsp;
+This concept was exactly what I was trying to do but I couldn't use this
+approach directly because it only provided for the device specific drivers to
+use minor numbers. <a href="#FAQ_why2majornumbers">Ref the FAQ for why I require
+so many minor device numbers.</a>&nbsp;</p>
+<p>Now, combining all of those problems together you end up with the WiSH
+project version 1.&nbsp; It basically created a generic abstraction layer for the X10
+protocol that maps /dev character devices to the X10 units on the network and
+connects to the port for the transceiver through the tty line discipline
+protocol.&nbsp;This proof of concept worked well but ran into problems when the 
+PowerLinc USB was released.&nbsp; In the Version 1 drivers, the PowerLinc USB 
+interface was created which made the USB PowerLinc device look like a serial 
+port but it didn't work like the serial drivers in its connection to the main 
+driver.&nbsp; This created confusion; but, more importantly, it made the drivers 
+a slave to the kernel development.&nbsp; While USB is fairly mature under 
+Windows and drivers are universally available, under Linux the USB system is 
+constantly evolving.&nbsp; Every revision of the kernel contained significant 
+changes to the USB system.&nbsp; Also, the HID driver that comes with the Linux 
+kernel immediately takes over the USB port and blocks the version 1 driver from 
+getting to the USB interface.&nbsp; As a result, the HID interface had to be 
+disabled or unloaded before the PowerLinc USB driver would work.&nbsp; Further, 
+I received criticism from individuals that felt that placing the state machine 
+and the log functionality into a kernel level module was a philosophical 
+departure from the concept of minimizing the work done in kernel space.</p>
+<p>So, while I don't agree that the kernel space must be minimized, I certainly 
+recognize that the most complex part of the driver is in the protocol simulator 
+and secondly in the transceiver driver.&nbsp; When kernel version 2.6 was 
+released to the public, the USB system had changed so significantly that I had 
+to scrap all of my current development and start from scratch.&nbsp; Further, 
+the micro task structure of the kernel changed causing even more rewires of the 
+main code.&nbsp; Therefore, version 2 of the drivers was started with the goal 
+of eliminating the driver's dependence on the kernel system calls for USB while 
+still maintaining the established /dev/x10 device interface.&nbsp; The new 
+architecture was fleshed out and the serial transceivers were implemented 
+rapidly.&nbsp; However, the USB HID interface drivers couldn't be made to work.&nbsp; 
+After a couple of months of trying, I finally resorted to the linux-usb-devel 
+group on sourceforge.net and found that the HID drivers for Linux are broken and 
+that there was a very simple patch available that fixed it.&nbsp; After applying 
+the patch, the drivers worked and within a week the version 2 drivers were 
+released.&nbsp; </p>
+<p>Version 1.0 of the drivers had all of the logic for simulating the X10
+protocol, the logic for communicating with the tty line discipline, and the
+logic for the protocol translator in a single file.&nbsp; This worked well for
+the initial driver to prove the concept.&nbsp; However, when the driver for the
+PowerLinc Serial was started, it became obvious that duplicating the x10
+protocol and the line discipline portion of the driver was going to create
+problems keeping them in sync as I found bugs since I would have to make the
+same update to both files.&nbsp;&nbsp;</p>
+<p>Version 1.2 made the evolutionary step of separating the protocol translator
+and /dev interface into standalone modules.&nbsp; This also led to separating the line
+discipline drivers from the protocol translator.&nbsp; The result was that the
+driver was loaded in 3 parts.&nbsp; First the user had to load x10.o to load the
+/dev and x10 protocol. simulator.&nbsp; Then the x10_ldisc.o to load the serial
+line discipline.&nbsp; Then the user had to load the transceiver specific module
+to make it all work.&nbsp;&nbsp;</p>
+<p>Version 1.3 was an evolutionary step in that the source was kept in separate
+files, but a fairly simple model of communications was implemented so that the
+three modules could be combined into one object file so that the user was not
+burdened with making sure that the modules got loaded in the correct
+order.&nbsp; While loading 3 modules could be easily scripted, it left the potential open
+for a module to be left out which would cause debugging difficulties. The 3
+driver approach made debugging easier since debug could be turned on for a
+single module, but it was cumbersome and awkward.</p>
+<p>Version 1.4 was the first version to go outside the bounds of serial
+communications.&nbsp; With this version, the USB drivers were implemented for
+the PowerLinc USB and slight changes were made to the overall interface.&nbsp;
+The modules were further focused so that each one had clearly distinct
+responsibilities which resulted in a cleaner implementation and fewer
+bugs.&nbsp; The names of all of the files were changed to gain consistency.&nbsp;&nbsp;</p>
+<p>Version 1.5 introduced better logging through circular queues, timestamps, 
+and non-blocking reads.&nbsp; </p>
+<p>Version 1.6 added x10watch and numerous bug fixes.</p>
+<p>Version 2.0 moved the state machine to userspace and moved all communications 
+with the transceiver to userspace.&nbsp; This version also moved to rely on 
+userspace level devices (/dev/ttyS0 and /dev/usb/hiddev0) for connectivity to 
+the transceivers.&nbsp; Version 2.0 is the alpha release and has been made to 
+work with kernels 2.4 and 2.6.&nbsp; </p>
+<p>Version 2.1 fixed a bug in cm11a_xcvr.c thanks to Michael H. Warfield and 
+also fixed the way that the drivers are compiled and installed without forcing 
+the user to recompile the kernel thanks to Michael H. Warfield.</p>
+<hr>
+<p><b><a name="Reference">Reference</a>:</b></p>
+
+<ol>
+  <li> <a href="http://www.hometoys.com/articles.htm#X-10%20Technical%20Series%20by%20Phil%20Kingery">Phil
+Kingery's X10 Technical Series</a>.&nbsp;A great deal of information for the X10 protocol.</li>
+  <li><a href="http://www.oreilly.com/catalog/linuxdrive2/">Linux Device
+    Drivers, 2nd Edition</a>, By <a href="http://www.oreillynet.com/cs/catalog/view/au/461?x-t=book.view">Alessandro&nbsp;Rubini</a>,&nbsp;<a href="http://www.oreillynet.com/cs/catalog/view/au/592?x-t=book.view">Jonathan&nbsp;Corbet</a>.
+    (<a href="http://www.xml.com/ldd/chapter/book/index.html">online</a>)</li>
+  <li><a href="http://sourceforge.net/projects/usbsnoop/">USB Sniffer</a>, a <b>free</b>,
+    software-only tool for monitoring USB traffic.</li>
+  <li><a href="http://www.smarthome.com/manuals/1132-A.pdf">PowerLinc Serial
+    Programming Manual</a></li>
+</ol>
+
+</body>
+
+</html>

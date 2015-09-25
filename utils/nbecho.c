@@ -1,6 +1,6 @@
 /*
  *
- * $Id: nbecho.c,v 1.1 2004/01/17 21:17:29 whiles Exp root $
+ * $Id: nbecho.c,v 1.2 2005/05/02 00:25:41 root Exp $
  *
  * Copyright (c) 2002 Scott Hiles
  *

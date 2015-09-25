@@ -1,7 +1,7 @@
 
 /*
  *
- * $Id: dev.c,v 1.22 2005/03/27 04:39:26 root Exp root $
+ * $Id: dev.c,v 1.23 2006/03/29 02:33:23 root Exp root $
  *
  * Copyright (c) 2002 Scott Hiles
  *
@@ -109,7 +109,7 @@ module_param(control_major,int,0);
 #endif
 MODULE_PARM_DESC(control_major, "Major character device for communicating with raw x10 transceiver (default=121)");
 
-#define DRIVER_VERSION "$Id: dev.c,v 1.22 2005/03/27 04:39:26 root Exp root $"
+#define DRIVER_VERSION "$Id: dev.c,v 1.23 2006/03/29 02:33:23 root Exp root $"
 char *version = DRIVER_VERSION;
 static int delay=1;
 

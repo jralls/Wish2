@@ -1,4 +1,4 @@
-$Id: CREDITS,v 1.1 2004/07/11 18:25:40 whiles Exp whiles $
+$Id: CREDITS,v 1.2 2005/01/24 02:07:34 whiles Exp $
 
 The need for a transceiver agnostic driver for Linux would likely have not
 been recognized had heyu (www.heyu.org) been created for the CM11A.

@@ -1,6 +1,6 @@
 /*
  *
- * $Id: nbread.c,v 1.1 2004/01/10 16:34:19 whiles Exp root $
+ * $Id: nbread.c,v 1.2 2005/05/02 00:26:00 root Exp $
  *
  * Copyright (c) 2002 Scott Hiles
  *
