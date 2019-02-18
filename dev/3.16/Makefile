@@ -35,13 +35,13 @@ PWD	:= $(shell pwd)
 
 CFLAGS_dev.o := -DCREATE_PROC
 
-default:
-	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
+all:
+	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
 install:
 	mkdir -p $(MDIR)
 	cp -f $(O_TARGET) $(MDIR)
 
 clean:
-	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) clean
+	$(MAKE) -C $(KDIR) M=$(PWD) clean
 
