@@ -10,7 +10,7 @@
  */
 
 #define DISTRIBUTION_VERSION "X10 DEV module v2.1.3 (wsh@sprintmail.com)"
-
+#define CREATE_PROC 1
 /* 
    This module is free software; you can redistribute it and/or
    modify it under the terms of the GNU Library General Public
