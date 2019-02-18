@@ -156,23 +156,23 @@ int parse_function(unsigned char *p,unsigned int mask)
         int j;
 
         for (j = 0; j < sizeof(cmd_list)/sizeof(struct cmd_list); j++)
-                if (!strnicmp(p,cmd_list[j].str,strlen(cmd_list[j].str)))
+                if (!strncasecmp(p,cmd_list[j].str,strlen(cmd_list[j].str)))
                         return cmd_list[j].fc;
 if (mask & X10_CMD_MASK_UNITCODES)
         for (j = 0; j < sizeof(uc_cmd_list)/sizeof(struct cmd_list); j++)
-                if (!strnicmp(p,uc_cmd_list[j].str,strlen(uc_cmd_list[j].str)))
+                if (!strncasecmp(p,uc_cmd_list[j].str,strlen(uc_cmd_list[j].str)))
                         return uc_cmd_list[j].fc;
 if (mask & X10_CMD_MASK_HOUSECODES)
         for (j = 0; j < sizeof(hc_cmd_list)/sizeof(struct cmd_list); j++)
-                if (!strnicmp(p,hc_cmd_list[j].str,strlen(hc_cmd_list[j].str)))
+                if (!strncasecmp(p,hc_cmd_list[j].str,strlen(hc_cmd_list[j].str)))
                         return hc_cmd_list[j].fc;
 if (mask & X10_CMD_MASK_EXTENDED)
         for (j = 0; j < sizeof(ex_cmd_list)/sizeof(struct cmd_list); j++)
-                if (!strnicmp(p,ex_cmd_list[j].str,strlen(ex_cmd_list[j].str)))
+                if (!strncasecmp(p,ex_cmd_list[j].str,strlen(ex_cmd_list[j].str)))
                         return ex_cmd_list[j].fc;
 if (mask & X10_CMD_MASK_PRESETDIM)
         for (j = 0; j < sizeof(ps_list)/sizeof(struct ps_list); j++)
-                if (!strnicmp(p,ps_list[j].str,strlen(p)))
+                if (!strncasecmp(p,ps_list[j].str,strlen(p)))
                         return ((ps_list[j].hc<<8) | ps_list[j].fc);
-        return -1;
+    return -1;
 }

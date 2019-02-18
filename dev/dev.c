@@ -116,12 +116,12 @@ static int delay=1;
 
 static __inline__ int XMAJOR (struct file *a)
 {
-  return MAJOR ((a)->f_dentry->d_inode->i_rdev);
+  return MAJOR ((a)->f_path.dentry->d_inode->i_rdev);
 }
 
 static __inline__ int XMINOR (struct file *a)
 {
-  return MINOR ((a)->f_dentry->d_inode->i_rdev);
+  return MINOR ((a)->f_path.dentry->d_inode->i_rdev);
 }
 
 /* prototypes for character device registration */
@@ -540,11 +540,11 @@ static struct proc_dir_entry *procdir, *procinfo;
 static int proc_read_info(char *page, char **start, off_t off, int counter,
                           int *eof, void *data)
 #else
-static int proc_read_info(struct file *filp, char *page, size_t counter,
+static ssize_t proc_read_info(struct file *filp, char *page, size_t counter,
                           loff_t *offp)
 #endif
 {
-  int len;
+  ssize_t len;
 //  MOD_INC_USE_COUNT;
   len = sprintf(page, "%s\nUserspace Status:  %s\n",
                 DISTRIBUTION_VERSION,
