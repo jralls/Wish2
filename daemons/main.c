@@ -49,10 +49,14 @@
 #include <libgen.h>
 #include <asm/types.h>
 #include <semaphore.h>
+#include <pthread.h>
+#include <strings.h>
 
 #include "x10.h"
-#include "strings.h"
+#include <x10_strings.h>
 #include "x10d.h"
+
+extern int strcasecmp (const char *__s1, const char *__s2);
 
 #define sighandler_type void
 
@@ -266,6 +270,7 @@ void syntax(int argc, char *argv[], int i)
   fprintf(stderr,"         -device	- transceiver device file\n");
 }
 
+void
 untty()
 {
   int i;

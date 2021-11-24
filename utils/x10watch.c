@@ -70,7 +70,7 @@ static sighandler_type die(int sig);
 static int watch();
 
 // these store the status.  It is possible that someone could specify /dev/x10/e
-int fd;
+static int fd = -1;
 
 int main(int argc, char *argv[])
 {
@@ -133,7 +133,8 @@ int main(int argc, char *argv[])
 	
 	fd = open(device,O_RDONLY);
 	if (fd < 0){
-		fprintf(stderr,"%s: error opening %d (%s)\n",progname,device,strerror(errno));
+		fprintf(stderr,"%s: error opening %s (%s)\n", progname, device,
+				strerror(errno));
 		exit(fd);
 	}
 	watch();
@@ -218,8 +219,9 @@ static void syntax(int argc, char *argv[], int i)
 	fprintf(stderr,"        -d: Turn on debug mode\n");
 }
 
-static sighandler_type die(sig)
+static sighandler_type die(int sig)
 {
-	close(fd);
+	if (fd > -1)
+		close(fd);
 }
 

@@ -19,16 +19,16 @@ endif
 all: $(daemons)
 
 cm11ad: main.o cm11a_xcvr.o
-	$(LD) -lpthread -Wall -o $@ $+
+	$(LD) $+ -lpthread -Wall -o $@
 
 pld: main.o pl_xcvr.o
-	$(LD) -lpthread -Wall -o $@ $+
+	$(LD) $+ -lpthread -Wall -o $@
 
 plusbd: main.o plusb_xcvr.o
-	$(LD) -lpthread -Wall -o $@ $+
+	$(LD) $+ -lpthread -Wall -o $@
 
 cm17ad: main.o cm17a_xcvr.o
-	$(LD) -lpthread -Wall -o $@ $+
+	$(LD) $+ -lpthread -Wall -o $@
 
 clean:
 	rm -f $(daemons)

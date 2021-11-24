@@ -205,7 +205,7 @@ void start()
 	}
 
 	gethostname(localhostname,sizeof(localhostname));
-	if (p = strchr(localhostname,'.')){
+	if ((p = strchr(localhostname,'.'))) {
 		*p++='\0';
 		localdomain = p;
 	}
@@ -251,7 +251,7 @@ static void write_log(int fd,char *buf,int len)
 	char *time = NULL;
 	time_t t;
 	struct tm tm;
-	char outbuf[128];
+	char outbuf[256];
 
 	if (buf[0] >= '0' || buf[0] <= '9'){
 		time = buf;

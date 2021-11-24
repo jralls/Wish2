@@ -60,7 +60,7 @@
 
 #define __X10_MODULE__
 #include "x10.h"
-#include "strings.h"
+#include "x10_strings.h"
 #include "dev.h"
 
 #undef CONFIG_OBSOLETE_MODPARM
@@ -126,7 +126,7 @@ static __inline__ int XMINOR (struct file *a)
 
 /* prototypes for character device registration */
 static int __init x10_init (void);
-static void __exit x10_exit (void);
+static void x10_exit (void);
 static int x10_open (struct inode *inode, struct file *file);
 static int x10_release (struct inode *inode, struct file *file);
 static ssize_t x10_read(struct file *file,char *buffer,size_t length, loff_t * offset);
@@ -441,7 +441,7 @@ typedef struct {
     int hc;		// housecode
     int uc;		// unit code
     int fc;		// function code
-    struct timeval tv;	// timestamp
+    struct timespec64 tv;	// timestamp
   } data[MAX_LOG];
   atomic_t begin;
   atomic_t end;
@@ -488,7 +488,7 @@ static void log_store(int dir,int hc, int uc, int fc)
   log.data[end].hc = hc;
   log.data[end].uc = uc;
   log.data[end].fc = fc;
-  do_gettimeofday(&log.data[end].tv);
+  ktime_get_real_ts64(&log.data[end].tv);
   spin_unlock(&log.spinlock);
   if (waitqueue_active(&log.changed))
     wake_up_interruptible(&log.changed);
@@ -497,7 +497,7 @@ static void log_store(int dir,int hc, int uc, int fc)
 static int log_get(loff_t *offset,unsigned char *ubuffer,int len)
 {
   int hc,uc,fc,dir;
-  struct timeval *tv;
+  struct timespec64 *tv;
   char tbuffer[80];
   int ret;
 
@@ -554,8 +554,8 @@ static ssize_t proc_read_info(struct file *filp, char *page, size_t counter,
 }
 
 #ifdef CREATE_PROC
-const struct file_operations proc_fops = {
-.read = proc_read_info
+const struct proc_ops proc_fops = {
+.proc_read = proc_read_info
 };
 #endif
 
@@ -632,7 +632,7 @@ error_dir:
   return returnvalue;
 }
 
-void __exit
+void
 x10_exit (void)
 {
   dbg ("%s", "Unloading X10 driver");
@@ -792,11 +792,14 @@ static loff_t x10_llseek(struct file *file, loff_t offset, int origin)
 }
 
 
-static ssize_t x10_read (struct file *file, char *ubuffer, size_t length, loff_t * offset)
+static ssize_t x10_read (struct file *file, char *ubuffer,
+						 size_t length, loff_t * offset)
 {
-  int minor = XMINOR (file);
-  int major = XMAJOR (file);
-  int hc = HOUSECODE (minor);
+  int major, minor, hc;
+  if (!file) return 0;
+  minor = XMINOR (file);
+  major = XMAJOR (file);
+  hc = HOUSECODE (minor);
 //  int uc = UNITCODE (minor);
 
   if (!(major == x10api.control_major && hc == X10_CONTROL_API)){
@@ -804,9 +807,11 @@ static ssize_t x10_read (struct file *file, char *ubuffer, size_t length, loff_t
     ANNOUNCE;
     dbg ("major=%d, minor=%d", major, minor);
     if (major == x10api.control_major)
-      dbg ("(CTRL) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
+      dbg ("(CTRL) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags,
+		   file->f_mode);
     else
-      dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags, file->f_mode);
+      dbg ("(DATA) file->f_flags = 0x%x file->f_mode=0x%x", file->f_flags,
+		   file->f_mode);
   }
 
   if (major == x10api.control_major && hc == X10_CONTROL_API){
